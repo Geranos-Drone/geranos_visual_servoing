@@ -65,7 +65,6 @@ namespace geranos {
 
 		mav_msgs::EigenOdometry current_odometry_;
 		Eigen::Vector3d current_pole_pos_;
-		Eigen::Quaterniond current_pole_rot_;
 
 		double max_v_; // m/s
 		double max_a_; // m/s^2

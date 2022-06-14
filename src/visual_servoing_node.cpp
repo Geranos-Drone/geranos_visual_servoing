@@ -29,6 +29,7 @@ namespace geranos {
   }
 
   void VisualServoingNode::poseEstimateCallback(const geometry_msgs::PoseStamped::ConstPtr& pose_msg) {
+    // transform pose to base frame
     geometry_msgs::PoseStamped pose_msg_B;
     try 
     {
@@ -38,8 +39,11 @@ namespace geranos {
     {
       ROS_ERROR("[VisualServoingNode] %s", ex.what());
     }
-    current_pole_pos_ = mav_msgs::vector3FromPointMsg(pose_msg_B.pose.position);
-    current_pole_rot_ = mav_msgs::quaternionFromMsg(pose_msg_B.pose.orientation);
+    // transform position to world frame
+    Eigen::Vector3d pole_pos_B = mav_msgs::vector3FromPointMsg(pose_msg_B.pose.position);
+    // Eigen::Matrix3d pole_rot_B = mav_msgs::quaternionFromMsg(pose_msg_B.pose.orientation).toRotationMatrix();
+    Eigen::Matrix3d R_W_B = current_odometry_.orientation_W_B.toRotationMatrix();
+    current_pole_pos_ = current_odometry_.position_W + R_W_B * pole_pos_B;
   }
 
   void VisualServoingNode::loadParams() {
@@ -70,7 +74,7 @@ namespace geranos {
       }
     catch (tf::TransformException ex)
       {
-        ROS_ERROR("%s",ex.what());
+        ROS_ERROR("[VisualServoingNode] %s",ex.what());
       }
     try
       {
@@ -83,7 +87,7 @@ namespace geranos {
       }
     catch (tf::TransformException ex)
       {
-        ROS_ERROR("%s",ex.what());
+        ROS_ERROR("[VisualServoingNode] %s",ex.what());
       }
   }
 
