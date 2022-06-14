@@ -7,11 +7,13 @@
 #include <nav_msgs/Odometry.h>
 #include <geometry_msgs/PoseStamped.h>
 #include <mav_planning_msgs/PolynomialTrajectory.h>
+#include <trajectory_msgs/MultiDOFJointTrajectory.h>
 
 // Trajectories
 #include <mav_trajectory_generation/trajectory.h>
 #include <mav_trajectory_generation/polynomial_optimization_nonlinear.h>
 #include <mav_trajectory_generation_ros/ros_conversions.h>
+#include <mav_trajectory_generation/trajectory_sampling.h>
 
 // tf
 #include <tf/transform_listener.h>
@@ -70,6 +72,9 @@ namespace geranos {
 		double max_a_; // m/s^2
 		double max_ang_v_;
 		double max_ang_a_;
+		double sampling_time_;
+
+		mav_msgs::EigenTrajectoryPoint::Vector states_;
 
 	};
 }

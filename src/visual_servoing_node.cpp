@@ -7,7 +7,7 @@ namespace geranos {
     tf2_(buffer_) {
       odometry_sub_ = nh_.subscribe(mav_msgs::default_topics::ODOMETRY, 1, &VisualServoingNode::odometryCallback, this);
       pose_estimate_sub_ = nh_.subscribe("PolePoseNode/EstimatedPose", 1, &VisualServoingNode::poseEstimateCallback, this);
-      pub_trajectory_ = nh_.advertise<mav_planning_msgs::PolynomialTrajectory>(ros::this_node::getName() + "/trajectory", 0);
+      pub_trajectory_ = nh_.advertise<trajectory_msgs::MultiDOFJointTrajectory>(ros::this_node::getName() + "/trajectory", 0);
       loadParams();
       loadTFs();
     }
@@ -59,6 +59,9 @@ namespace geranos {
     if (!nh_.getParam(ros::this_node::getName() + "/max_ang_a", max_ang_a_)){
       ROS_WARN("[VisualServoingNode] param max_ang_a not found");
     }
+    if (!nh_.getParam(ros::this_node::getName() + "/sampling_time", sampling_time_)){
+      ROS_WARN("[VisualServoingNode] param sampling_time not found");
+    }
   }
 
   void VisualServoingNode::loadTFs() {
@@ -89,6 +92,24 @@ namespace geranos {
       {
         ROS_ERROR("[VisualServoingNode] %s",ex.what());
       }
+  }
+
+  void VisualServoingNode::run() {
+    mav_trajectory_generation::Trajectory trajectory;
+    Eigen::VectorXd goal_vel;
+    goal_vel << 0.0, 0.0, 0.0;
+    if(!planTrajectory(current_pole_pos_, goal_vel, 
+                    current_odometry_.position_W, 
+                    current_odometry_.velocity_B,
+                    max_v_, max_a_, &trajectory)) {
+      ROS_ERROR_STREAM("[VisualServoingNode] Failed to plan Trajectory!");
+      return;
+    }
+    // Sample:
+    states_.clear();
+    mav_trajectory_generation::sampleWholeTrajectory(trajectory, sampling_time_,
+                                                   &states_);
+    publishTrajectory(trajectory);
   }
 
   // Plans a trajectory from a start position and velocity to a goal position and velocity
@@ -153,11 +174,11 @@ namespace geranos {
   }
 
   void VisualServoingNode::publishTrajectory(const mav_trajectory_generation::Trajectory& trajectory) {
-    mav_planning_msgs::PolynomialTrajectory msg;
-    mav_trajectory_generation::trajectoryToPolynomialTrajectoryMsg(trajectory,
-                                                                   &msg);
-    msg.header.frame_id = "world";
-    pub_trajectory_.publish(msg);
+    trajectory_msgs::MultiDOFJointTrajectory trajectory_msg;
+    mav_msgs::msgMultiDofJointTrajectoryFromEigen(states_, &trajectory_msg);
+    trajectory_msg.header.frame_id = "world";
+    trajectory_msg.header.stamp = ros::Time::now();
+    pub_trajectory_.publish(trajectory_msg);
   }
 } //namespace geranos
 
