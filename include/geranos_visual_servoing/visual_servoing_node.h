@@ -1,6 +1,6 @@
 #include <ros/ros.h>
 
-//msgs
+// msgs
 #include <mav_msgs/conversions.h>
 #include <mav_msgs/default_topics.h>
 #include <mav_msgs/common.h>
@@ -13,15 +13,22 @@
 #include <mav_trajectory_generation/polynomial_optimization_nonlinear.h>
 #include <mav_trajectory_generation_ros/ros_conversions.h>
 
-//tf
+// tf
 #include <tf/transform_listener.h>
 #include <tf_conversions/tf_eigen.h>
+
+// tf2
+#include "tf2_ros/transform_listener.h"
+#include "tf2_ros/message_filter.h"
+#include "tf2_geometry_msgs/tf2_geometry_msgs.h"
 
 namespace geranos {
 	class VisualServoingNode {
 	public:
 		VisualServoingNode(const ros::NodeHandle& nh, const ros::NodeHandle& private_nh);
 		~VisualServoingNode();
+
+		void run();
 	private:
 		void odometryCallback(const nav_msgs::OdometryConstPtr& odometry_msg);
 		void poseEstimateCallback(const geometry_msgs::PoseStamped::ConstPtr& pose_msg);
@@ -31,8 +38,6 @@ namespace geranos {
 
 		void transformPose();
 		void transformOdometry(mav_msgs::EigenOdometry& odometry);
-
-		void run();
 
 		bool planTrajectory(const Eigen::VectorXd& goal_pos,
 	                          const Eigen::VectorXd& goal_vel,
@@ -54,6 +59,9 @@ namespace geranos {
 	  	tf::StampedTransform tf_base_cam_;
 	  	Eigen::Affine3d T_B_imu_;
 	  	Eigen::Affine3d T_B_cam_;
+
+	  	tf2_ros::Buffer buffer_;
+  		tf2_ros::TransformListener tf2_;
 
 		mav_msgs::EigenOdometry current_odometry_;
 		Eigen::Vector3d current_pole_pos_;

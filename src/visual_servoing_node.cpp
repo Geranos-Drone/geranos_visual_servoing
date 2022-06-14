@@ -3,7 +3,8 @@
 namespace geranos {
   VisualServoingNode::VisualServoingNode(const ros::NodeHandle& nh, const ros::NodeHandle& private_nh) : 
     nh_(nh),
-    private_nh_(private_nh) {
+    private_nh_(private_nh),
+    tf2_(buffer_) {
       odometry_sub_ = nh_.subscribe(mav_msgs::default_topics::ODOMETRY, 1, &VisualServoingNode::odometryCallback, this);
       pose_estimate_sub_ = nh_.subscribe("PolePoseNode/EstimatedPose", 1, &VisualServoingNode::poseEstimateCallback, this);
       pub_trajectory_ = nh_.advertise<mav_planning_msgs::PolynomialTrajectory>(ros::this_node::getName() + "/trajectory", 0);
@@ -28,8 +29,17 @@ namespace geranos {
   }
 
   void VisualServoingNode::poseEstimateCallback(const geometry_msgs::PoseStamped::ConstPtr& pose_msg) {
-    current_pole_pos_ = mav_msgs::vector3FromPointMsg(pose_msg->pose.position);
-    current_pole_rot_ = mav_msgs::quaternionFromMsg(pose_msg->pose.orientation);
+    geometry_msgs::PoseStamped pose_msg_B;
+    try 
+    {
+      buffer_.transform(*pose_msg, pose_msg_B, "base");
+    }
+    catch (tf2::TransformException &ex)
+    {
+      ROS_ERROR("[VisualServoingNode] %s", ex.what());
+    }
+    current_pole_pos_ = mav_msgs::vector3FromPointMsg(pose_msg_B.pose.position);
+    current_pole_rot_ = mav_msgs::quaternionFromMsg(pose_msg_B.pose.orientation);
   }
 
   void VisualServoingNode::loadParams() {
