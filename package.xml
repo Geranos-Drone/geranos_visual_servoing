@@ -15,5 +15,8 @@
   <buildtool_depend>catkin_simple</buildtool_depend>
 
   <depend>roscpp</depend>
+  <depend>geometry_msgs</depend>
+  <depend>nav_msgs</depend>
+  <depend>mav_msgs</depend>
 
 </package>
