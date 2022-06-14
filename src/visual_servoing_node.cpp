@@ -16,6 +16,15 @@ namespace geranos {
   void VisualServoingNode::odometryCallback(const nav_msgs::OdometryConstPtr& odometry_msg) {
     ROS_INFO_ONCE("VisualServoingNode received first odometry!");
     mav_msgs::eigenOdometryFromMsg(*odometry_msg, &current_odometry_);
+    transformOdometry(current_odometry_);
+  }
+
+  void VisualServoingNode::transformOdometry(mav_msgs::EigenOdometry& odometry) {
+    Eigen::Matrix3d R_B_imu = T_B_imu_.rotation();  // rotation from imu to body frame
+    Eigen::Vector3d r_B_imu_imu = T_B_imu_.translation();  // body to imu offset expressed in base frame
+    Eigen::Matrix3d R_W_B = odometry.orientation_W_B.toRotationMatrix();
+    // add translational offset between imu and body frame
+    odometry.position_W -= R_W_B * R_B_imu * r_B_imu_imu;
   }
 
   void VisualServoingNode::poseEstimateCallback(const geometry_msgs::PoseStamped::ConstPtr& pose_msg) {

@@ -30,7 +30,9 @@ namespace geranos {
 		void loadTFs();
 
 		void transformPose();
-		void transformOdometry();
+		void transformOdometry(mav_msgs::EigenOdometry& odometry);
+
+		void run();
 
 		bool planTrajectory(const Eigen::VectorXd& goal_pos,
 	                          const Eigen::VectorXd& goal_vel,
