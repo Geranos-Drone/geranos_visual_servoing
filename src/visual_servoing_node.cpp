@@ -192,10 +192,14 @@ int main(int argc, char** argv) {
   ros::init(argc, argv, "visual_servoing_node");
 
   ros::NodeHandle nh, private_nh("~");
+  ros::Rate rate(2); // Node Rate 2Hz
 
   auto Node = makeNode(nh, private_nh);
 
-  ros::spin();
+  while (ros::ok()) {
+    Node->run();
+    rate.sleep();
+  }
 
   return 0;
 }
