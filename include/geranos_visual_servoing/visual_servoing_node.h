@@ -34,6 +34,7 @@ namespace geranos {
 	private:
 		void odometryCallback(const nav_msgs::OdometryConstPtr& odometry_msg);
 		void poseEstimateCallback(const geometry_msgs::PoseStamped::ConstPtr& pose_msg);
+		void poleViconCallback(const geometry_msgs::TransformStamped& pole_transform_msg);
 
 		void loadParams();
 		void loadTFs();
@@ -54,6 +55,7 @@ namespace geranos {
 
 		ros::Subscriber odometry_sub_;
 		ros::Subscriber pose_estimate_sub_;
+		ros::Subscriber pole_vicon_sub_;
 		ros::Publisher pub_trajectory_;
 
 		tf::TransformListener tf_listener_;
@@ -67,6 +69,9 @@ namespace geranos {
 
 		mav_msgs::EigenOdometry current_odometry_;
 		Eigen::Vector3d current_pole_pos_;
+		mav_msgs::EigenTrajectoryPoint pole_trajectory_point_;
+		Eigen::Vector3d current_pole_pos_vicon_;
+
 
 		double max_v_; // m/s
 		double max_a_; // m/s^2

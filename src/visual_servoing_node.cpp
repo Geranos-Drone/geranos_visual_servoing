@@ -6,6 +6,7 @@ namespace geranos {
     private_nh_(private_nh),
     tf2_(buffer_) {
       odometry_sub_ = nh_.subscribe(mav_msgs::default_topics::ODOMETRY, 1, &VisualServoingNode::odometryCallback, this);
+      pole_vicon_sub_ = nh_.subscribe("pole_white_transform", 1, &VisualServoingNode::poleViconCallback, this);
       pose_estimate_sub_ = nh_.subscribe("PolePoseNode/EstimatedPose", 1, &VisualServoingNode::poseEstimateCallback, this);
       pub_trajectory_ = nh_.advertise<trajectory_msgs::MultiDOFJointTrajectory>(ros::this_node::getName() + "/trajectory", 0);
       loadParams();
@@ -44,6 +45,13 @@ namespace geranos {
     // Eigen::Matrix3d pole_rot_B = mav_msgs::quaternionFromMsg(pose_msg_B.pose.orientation).toRotationMatrix();
     Eigen::Matrix3d R_W_B = current_odometry_.orientation_W_B.toRotationMatrix();
     current_pole_pos_ = current_odometry_.position_W + R_W_B * pole_pos_B;
+  }
+
+  void VisualServoingNode::poleViconCallback(const geometry_msgs::TransformStamped& pole_transform_msg) {
+    return;
+    ROS_INFO_ONCE("[VisualServoingNode] Received first transform of Pole!");
+    mav_msgs::eigenTrajectoryPointFromTransformMsg(pole_transform_msg, &pole_trajectory_point_);
+    current_pole_pos_vicon_ = pole_trajectory_point_.position_W;
   }
 
   void VisualServoingNode::loadParams() {
@@ -98,7 +106,17 @@ namespace geranos {
     mav_trajectory_generation::Trajectory trajectory;
     Eigen::VectorXd goal_vel;
     goal_vel << 0.0, 0.0, 0.0;
-    if(!planTrajectory(current_pole_pos_, goal_vel, 
+    
+    // if(!planTrajectory(current_pole_pos_, goal_vel, 
+    //                 current_odometry_.position_W, 
+    //                 current_odometry_.velocity_B,
+    //                 max_v_, max_a_, &trajectory)) {
+    //   ROS_ERROR_STREAM("[VisualServoingNode] Failed to plan Trajectory!");
+    //   return;
+    // }
+
+    //DEBUG WITH VICON POSITION
+    if(!planTrajectory(current_pole_pos_vicon_, goal_vel, 
                     current_odometry_.position_W, 
                     current_odometry_.velocity_B,
                     max_v_, max_a_, &trajectory)) {
