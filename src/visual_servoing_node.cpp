@@ -9,6 +9,8 @@ namespace geranos {
       pole_vicon_sub_ = nh_.subscribe("pole_white_transform", 1, &VisualServoingNode::poleViconCallback, this);
       pose_estimate_sub_ = nh_.subscribe("PolePoseNode/EstimatedPose", 1, &VisualServoingNode::poseEstimateCallback, this);
       pub_trajectory_ = nh_.advertise<trajectory_msgs::MultiDOFJointTrajectory>(ros::this_node::getName() + "/trajectory", 0);
+      // create publisher for RVIZ markers
+      pub_markers_ = nh_.advertise<visualization_msgs::MarkerArray>(ros::this_node::getName() + "/trajectory_markers", 0);
       loadParams();
       loadTFs();
     }
@@ -128,11 +130,20 @@ namespace geranos {
       ROS_ERROR_STREAM("[VisualServoingNode] Failed to plan Trajectory!");
       return;
     }
+    // get markers to display them in RVIZ
+    visualization_msgs::MarkerArray markers;
+    double distance = 0.2; // Distance by which to seperate additional markers. Set 0.0 to disable.
+    std::string frame_id = "world";
+
+    mav_trajectory_generation::drawMavTrajectory(trajectory,
+                                                 distance,
+                                                 frame_id,
+                                                 &markers);
     // Sample:
     states_.clear();
-    mav_trajectory_generation::sampleWholeTrajectory(trajectory, sampling_time_,
-                                                   &states_);
-    publishTrajectory(trajectory);
+    mav_trajectory_generation::sampleWholeTrajectory(trajectory, sampling_time_, &states_);
+    
+    publishTrajectory(trajectory, markers);
   }
 
   // Plans a trajectory from a start position and velocity to a goal position and velocity
@@ -196,7 +207,8 @@ namespace geranos {
     return true;
   }
 
-  void VisualServoingNode::publishTrajectory(const mav_trajectory_generation::Trajectory& trajectory) {
+  void VisualServoingNode::publishTrajectory(const mav_trajectory_generation::Trajectory& trajectory, const visualization_msgs::MarkerArray& markers) {
+    pub_markers_.publish(markers);
     trajectory_msgs::MultiDOFJointTrajectory trajectory_msg;
     mav_msgs::msgMultiDofJointTrajectoryFromEigen(states_, &trajectory_msg);
     trajectory_msg.header.frame_id = "world";

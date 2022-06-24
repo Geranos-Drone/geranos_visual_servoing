@@ -13,6 +13,7 @@
 #include <mav_trajectory_generation/trajectory.h>
 #include <mav_trajectory_generation/polynomial_optimization_nonlinear.h>
 #include <mav_trajectory_generation_ros/ros_conversions.h>
+#include <mav_trajectory_generation_ros/ros_visualization.h>
 #include <mav_trajectory_generation/trajectory_sampling.h>
 
 // tf
@@ -48,7 +49,7 @@ namespace geranos {
 	                          const Eigen::VectorXd& start_vel,
 	                          double v_max, double a_max,
 	                          mav_trajectory_generation::Trajectory* trajectory);
-		void publishTrajectory(const mav_trajectory_generation::Trajectory& trajectory);
+		void publishTrajectory(const mav_trajectory_generation::Trajectory& trajectory, const visualization_msgs::MarkerArray& markers);
 
 		ros::NodeHandle nh_;
 		ros::NodeHandle private_nh_;
@@ -57,6 +58,7 @@ namespace geranos {
 		ros::Subscriber pose_estimate_sub_;
 		ros::Subscriber pole_vicon_sub_;
 		ros::Publisher pub_trajectory_;
+		ros::Publisher pub_markers_;
 
 		tf::TransformListener tf_listener_;
 	  	tf::StampedTransform tf_base_imu_;
