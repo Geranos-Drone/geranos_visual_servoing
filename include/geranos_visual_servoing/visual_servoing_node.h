@@ -62,7 +62,8 @@ namespace geranos {
 	  	tf::StampedTransform tf_base_imu_;
 	  	tf::StampedTransform tf_base_cam_;
 	  	Eigen::Affine3d T_B_imu_;
-	  	Eigen::Affine3d T_B_cam_;
+	  	Eigen::Matrix3d R_B_cam_;
+	  	Eigen::Vector3d t_B_cam_;
 
 	  	tf2_ros::Buffer buffer_;
   		tf2_ros::TransformListener tf2_;
