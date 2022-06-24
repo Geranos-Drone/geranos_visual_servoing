@@ -4,7 +4,9 @@ namespace geranos {
   VisualServoingNode::VisualServoingNode(const ros::NodeHandle& nh, const ros::NodeHandle& private_nh) : 
     nh_(nh),
     private_nh_(private_nh),
-    tf2_(buffer_) {
+    tf2_(buffer_),
+    received_odometry_(false),
+    received_pole_pose_(false) {
       odometry_sub_ = nh_.subscribe(mav_msgs::default_topics::ODOMETRY, 1, &VisualServoingNode::odometryCallback, this);
       pole_vicon_sub_ = nh_.subscribe("pole_white_transform", 1, &VisualServoingNode::poleViconCallback, this);
       pose_estimate_sub_ = nh_.subscribe("PolePoseNode/EstimatedPose", 1, &VisualServoingNode::poseEstimateCallback, this);
@@ -110,9 +112,13 @@ namespace geranos {
   }
 
   void VisualServoingNode::run() {
+    ROS_INFO_STREAM("[VisualServoingNode] RUNNING");
     mav_trajectory_generation::Trajectory trajectory;
-    Eigen::VectorXd goal_vel;
+    Eigen::Vector3d goal_vel;
     goal_vel << 0.0, 0.0, 0.0;
+
+    if (!received_odometry_ || !received_pole_pose_)
+      return;
 
     // if(!planTrajectory(current_pole_pos_, goal_vel, 
     //                 current_odometry_.position_W, 
@@ -142,7 +148,7 @@ namespace geranos {
     // Sample:
     states_.clear();
     mav_trajectory_generation::sampleWholeTrajectory(trajectory, sampling_time_, &states_);
-    
+
     publishTrajectory(trajectory, markers);
   }
 

@@ -75,6 +75,8 @@ namespace geranos {
 		mav_msgs::EigenTrajectoryPoint pole_trajectory_point_;
 		Eigen::Vector3d current_pole_pos_vicon_;
 
+		bool received_odometry_;
+		bool received_pole_pose_;
 
 		double max_v_; // m/s
 		double max_a_; // m/s^2
