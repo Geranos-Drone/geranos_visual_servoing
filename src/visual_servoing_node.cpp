@@ -23,6 +23,7 @@ namespace geranos {
     ROS_INFO_ONCE("VisualServoingNode received first odometry!");
     mav_msgs::eigenOdometryFromMsg(*odometry_msg, &current_odometry_);
     transformOdometry(current_odometry_);
+    received_odometry_ = true;
   }
 
   void VisualServoingNode::transformOdometry(mav_msgs::EigenOdometry& odometry) {
@@ -51,6 +52,7 @@ namespace geranos {
     // transform position to world frame
     Eigen::Matrix3d R_W_B = current_odometry_.orientation_W_B.toRotationMatrix();
     current_pole_pos_ = current_odometry_.position_W + R_W_B * pole_pos_B;
+    received_pole_pose_ = true;
   }
 
   void VisualServoingNode::poleViconCallback(const geometry_msgs::TransformStamped& pole_transform_msg) {
