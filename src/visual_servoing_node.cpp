@@ -10,9 +10,12 @@ namespace geranos {
       odometry_sub_ = nh_.subscribe(mav_msgs::default_topics::ODOMETRY, 1, &VisualServoingNode::odometryCallback, this);
       pole_vicon_sub_ = nh_.subscribe("pole_white_transform", 1, &VisualServoingNode::poleViconCallback, this);
       pose_estimate_sub_ = nh_.subscribe("PolePoseNode/EstimatedPose", 1, &VisualServoingNode::poseEstimateCallback, this);
+      // create publisher for trajectory
       pub_trajectory_ = nh_.advertise<trajectory_msgs::MultiDOFJointTrajectory>(ros::this_node::getName() + "/trajectory", 0);
       // create publisher for RVIZ markers
       pub_markers_ = nh_.advertise<visualization_msgs::MarkerArray>(ros::this_node::getName() + "/trajectory_markers", 0);
+      // create publisher for estimation error
+      error_pub_ = nh_.advertise<geometry_msgs::Vector3>(ros::this_node::getName() + "/error_vector", 0);
       loadParams();
       loadTFs();
     }
@@ -56,10 +59,17 @@ namespace geranos {
   }
 
   void VisualServoingNode::poleViconCallback(const geometry_msgs::TransformStamped& pole_transform_msg) {
-    return;
     ROS_INFO_ONCE("[VisualServoingNode] Received first transform of Pole!");
     mav_msgs::eigenTrajectoryPointFromTransformMsg(pole_transform_msg, &pole_trajectory_point_);
     current_pole_pos_vicon_ = pole_trajectory_point_.position_W;
+    //calculate error from estimation
+    if (received_pole_pose_) {
+      Eigen::Vector3d error_vector = current_pole_pos_vicon_ - current_pole_pos_;
+      error_vector = error_vector.cwiseAbs();
+      geometry_msgs::Vector3 error_msg;
+      mav_msgs::vectorEigenToMsg(error_vector, &error_msg);
+      error_pub_.publish(error_msg);
+    }
   }
 
   void VisualServoingNode::loadParams() {

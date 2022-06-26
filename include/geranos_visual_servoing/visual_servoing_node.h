@@ -6,6 +6,7 @@
 #include <mav_msgs/common.h>
 #include <nav_msgs/Odometry.h>
 #include <geometry_msgs/PoseStamped.h>
+#include <geometry_msgs/Vector3.h>
 #include <mav_planning_msgs/PolynomialTrajectory.h>
 #include <trajectory_msgs/MultiDOFJointTrajectory.h>
 
@@ -59,6 +60,7 @@ namespace geranos {
 		ros::Subscriber pole_vicon_sub_;
 		ros::Publisher pub_trajectory_;
 		ros::Publisher pub_markers_;
+		ros::Publisher error_pub_;
 
 		tf::TransformListener tf_listener_;
 	  	tf::StampedTransform tf_base_imu_;
