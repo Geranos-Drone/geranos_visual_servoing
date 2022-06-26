@@ -142,11 +142,8 @@ namespace geranos {
     visualization_msgs::MarkerArray markers;
     double distance = 0.2; // Distance by which to seperate additional markers. Set 0.0 to disable.
     std::string frame_id = "world";
-
-    mav_trajectory_generation::drawMavTrajectory(trajectory,
-                                                 distance,
-                                                 frame_id,
-                                                 &markers);
+    mav_trajectory_generation::drawMavTrajectory(trajectory, distance, frame_id, &markers);
+    
     // Sample:
     states_.clear();
     mav_trajectory_generation::sampleWholeTrajectory(trajectory, sampling_time_, &states_);
@@ -161,6 +158,7 @@ namespace geranos {
                                       const Eigen::VectorXd& start_vel,
                                       double v_max, double a_max,
                                       mav_trajectory_generation::Trajectory* trajectory) {
+    ROS_INFO_STREAM("[VisualServoingNode] PLAN TRAJECTORY");
     assert(trajectory);
     const int dimension = goal_pos.size();
     assert(dimension == 3);

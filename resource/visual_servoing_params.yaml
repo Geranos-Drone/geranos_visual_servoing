@@ -1,4 +1,3 @@
-visual_servoing_node:  
-  sampling_time: 0.01
-  max_v: 0.5
-  max_a: 0.5
+sampling_time: 0.01
+max_v: 0.5
+max_a: 0.5
