@@ -60,6 +60,7 @@ namespace geranos {
 		ros::Subscriber pole_vicon_sub_;
 		ros::Publisher pub_trajectory_;
 		ros::Publisher pub_markers_;
+		ros::Publisher pole_pos_pub_;
 		ros::Publisher error_pub_;
 
 		tf::TransformListener tf_listener_;
