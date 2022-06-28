@@ -18,6 +18,9 @@ namespace geranos {
       pub_markers_ = nh_.advertise<visualization_msgs::MarkerArray>(ros::this_node::getName() + "/trajectory_markers", 0);
       // create publisher for estimation error
       error_pub_ = nh_.advertise<geometry_msgs::Vector3>(ros::this_node::getName() + "/error_vector", 0);
+
+      timer_ = nh_.createTimer(ros::Duration(0.5), &VisualServoingNode::run, this);
+
       loadParams();
       loadTFs();
     }
@@ -120,7 +123,7 @@ namespace geranos {
       }
   }
 
-  void VisualServoingNode::run() {
+  void VisualServoingNode::run(const ros::TimerEvent& event) {
     ROS_INFO_STREAM("[VisualServoingNode] RUNNING");
     mav_trajectory_generation::Trajectory trajectory;
     Eigen::Vector3d goal_vel;
@@ -240,15 +243,10 @@ int main(int argc, char** argv) {
   ros::init(argc, argv, "visual_servoing_node");
 
   ros::NodeHandle nh, private_nh("~");
-  ros::Rate rate(2); // Node Rate 2Hz
 
   auto Node = makeNode(nh, private_nh);
 
-  while (ros::ok()) {
-    Node->run();
-    ros::spinOnce();
-    rate.sleep();
-  }
+  ros::spin();
 
   return 0;
 }
