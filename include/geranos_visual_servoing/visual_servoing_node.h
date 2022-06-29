@@ -6,6 +6,7 @@
 #include <mav_msgs/common.h>
 #include <nav_msgs/Odometry.h>
 #include <geometry_msgs/PoseStamped.h>
+#include <geometry_msgs/PointStamped.h>
 #include <geometry_msgs/Vector3.h>
 #include <mav_planning_msgs/PolynomialTrajectory.h>
 #include <trajectory_msgs/MultiDOFJointTrajectory.h>

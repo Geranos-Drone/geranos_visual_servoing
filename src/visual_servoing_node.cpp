@@ -15,7 +15,7 @@ namespace geranos {
       // create publisher for RVIZ markers
       pub_markers_ = nh_.advertise<visualization_msgs::MarkerArray>(ros::this_node::getName() + "/trajectory_markers", 0);
       // create publisher for estimation error
-      error_pub_ = nh_.advertise<geometry_msgs::Vector3>(ros::this_node::getName() + "/error_vector", 0);
+      error_pub_ = nh_.advertise<geometry_msgs::PointStamped>(ros::this_node::getName() + "/error_vector", 0);
       loadParams();
       loadTFs();
     }
@@ -65,9 +65,12 @@ namespace geranos {
     //calculate error from estimation
     if (received_pole_pose_) {
       Eigen::Vector3d error_vector = current_pole_pos_vicon_ - current_pole_pos_;
-      error_vector = error_vector.cwiseAbs();
-      geometry_msgs::Vector3 error_msg;
-      mav_msgs::vectorEigenToMsg(error_vector, &error_msg);
+      geometry_msgs::PointStamped error_msg;
+      error_msg.header.stamp = ros::Time::now();
+      error_msg.header.frame_id = "world";
+      error_msg.point.x = error_vector(0);
+      error_msg.point.y = error_vector(1);
+      error_msg.point.z = error_vector(2);
       error_pub_.publish(error_msg);
     }
   }
