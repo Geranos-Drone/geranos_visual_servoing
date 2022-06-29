@@ -13,7 +13,7 @@ namespace geranos {
       // create publisher for trajectory
       pub_trajectory_ = nh_.advertise<trajectory_msgs::MultiDOFJointTrajectory>(ros::this_node::getName() + "/trajectory", 0);
       // create publisher for estimated pole position
-      pole_pos_pub_ = nh_.advertise<geometry_msgs::Vector3>(ros::this_node::getName() + "/estimated_pole_position", 0);
+      pole_pos_pub_ = nh_.advertise<geometry_msgs::PointStamped>(ros::this_node::getName() + "/estimated_pole_position", 0);
       // create publisher for RVIZ markers
       pub_markers_ = nh_.advertise<visualization_msgs::MarkerArray>(ros::this_node::getName() + "/trajectory_markers", 0);
       // create publisher for estimation error
@@ -52,8 +52,12 @@ namespace geranos {
     Eigen::Matrix3d R_W_B = current_odometry_.orientation_W_B.toRotationMatrix();
     current_pole_pos_ = current_odometry_.position_W + R_W_B * pole_pos_B;
     received_pole_pose_ = true;
-    geometry_msgs::Vector3 pole_pos_msg;
-    mav_msgs::vectorEigenToMsg(current_pole_pos_, &pole_pos_msg);
+    geometry_msgs::PointStamped pole_pos_msg;
+    pole_pos_msg.header.stamp = ros::Time::now();
+    pole_pos_msg.header.frame_id = "world";
+    pole_pos_msg.point.x = current_pole_pos_(0);
+    pole_pos_msg.point.y = current_pole_pos_(1);
+    pole_pos_msg.point.z = current_pole_pos_(2);
     pole_pos_pub_.publish(pole_pos_msg);
   }
 
