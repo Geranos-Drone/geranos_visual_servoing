@@ -1,6 +1,15 @@
 #include <geranos_visual_servoing/visual_servoing_node.h>
 
 namespace geranos {
+
+  void getPointMsgFromEigen(const Eigen::Vector3d& vec, geometry_msgs::PointStamped* msg) {
+    msg->header.stamp = ros::Time::now();
+    msg->header.frame_id = "world";
+    msg->point.x = vec(0);
+    msg->point.y = vec(1);
+    msg->point.z = vec(2);
+  }
+
   VisualServoingNode::VisualServoingNode(const ros::NodeHandle& nh, const ros::NodeHandle& private_nh) : 
     nh_(nh),
     private_nh_(private_nh),
@@ -53,11 +62,7 @@ namespace geranos {
     current_pole_pos_ = current_odometry_.position_W + R_W_B * pole_pos_B;
     received_pole_pose_ = true;
     geometry_msgs::PointStamped pole_pos_msg;
-    pole_pos_msg.header.stamp = ros::Time::now();
-    pole_pos_msg.header.frame_id = "world";
-    pole_pos_msg.point.x = current_pole_pos_(0);
-    pole_pos_msg.point.y = current_pole_pos_(1);
-    pole_pos_msg.point.z = current_pole_pos_(2);
+    getPointMsgFromEigen(current_pole_pos_, &pole_pos_msg);
     pole_pos_pub_.publish(pole_pos_msg);
   }
 
@@ -70,11 +75,7 @@ namespace geranos {
       ROS_INFO_STREAM("[VisualServoingNode] Publishing error_vector");
       Eigen::Vector3d error_vector = current_pole_pos_vicon_ - current_pole_pos_;
       geometry_msgs::PointStamped error_msg;
-      error_msg.header.stamp = ros::Time::now();
-      error_msg.header.frame_id = "world";
-      error_msg.point.x = error_vector(0);
-      error_msg.point.y = error_vector(1);
-      error_msg.point.z = error_vector(2);
+      getPointMsgFromEigen(error_vector, &error_msg);
       error_pub_.publish(error_msg);
     }
   }
