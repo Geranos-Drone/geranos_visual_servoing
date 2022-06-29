@@ -33,7 +33,7 @@ namespace geranos {
 		VisualServoingNode(const ros::NodeHandle& nh, const ros::NodeHandle& private_nh);
 		~VisualServoingNode();
 
-		void run();
+		void run(const ros::TimerEvent& event);
 	private:
 		void odometryCallback(const nav_msgs::OdometryConstPtr& odometry_msg);
 		void poseEstimateCallback(const geometry_msgs::PoseStamped::ConstPtr& pose_msg);
@@ -61,7 +61,10 @@ namespace geranos {
 		ros::Subscriber pole_vicon_sub_;
 		ros::Publisher pub_trajectory_;
 		ros::Publisher pub_markers_;
+		ros::Publisher pole_pos_pub_;
 		ros::Publisher error_pub_;
+
+		ros::Timer timer_;
 
 		tf::TransformListener tf_listener_;
 	  	tf::StampedTransform tf_base_imu_;

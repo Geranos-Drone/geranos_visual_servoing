@@ -8,14 +8,19 @@ namespace geranos {
     received_odometry_(false),
     received_pole_pose_(false) {
       odometry_sub_ = nh_.subscribe(mav_msgs::default_topics::ODOMETRY, 1, &VisualServoingNode::odometryCallback, this);
-      pole_vicon_sub_ = nh_.subscribe("pole_white_transform", 1, &VisualServoingNode::poleViconCallback, this);
+      pole_vicon_sub_ = nh_.subscribe("geranos_pole_white/vrpn_client/estimated_transform", 1, &VisualServoingNode::poleViconCallback, this);
       pose_estimate_sub_ = nh_.subscribe("PolePoseNode/EstimatedPose", 1, &VisualServoingNode::poseEstimateCallback, this);
       // create publisher for trajectory
       pub_trajectory_ = nh_.advertise<trajectory_msgs::MultiDOFJointTrajectory>(ros::this_node::getName() + "/trajectory", 0);
+      // create publisher for estimated pole position
+      pole_pos_pub_ = nh_.advertise<geometry_msgs::Vector3>(ros::this_node::getName() + "/estimated_pole_position", 0);
       // create publisher for RVIZ markers
       pub_markers_ = nh_.advertise<visualization_msgs::MarkerArray>(ros::this_node::getName() + "/trajectory_markers", 0);
       // create publisher for estimation error
       error_pub_ = nh_.advertise<geometry_msgs::PointStamped>(ros::this_node::getName() + "/error_vector", 0);
+
+      timer_ = nh_.createTimer(ros::Duration(0.5), &VisualServoingNode::run, this);
+
       loadParams();
       loadTFs();
     }
@@ -39,16 +44,7 @@ namespace geranos {
 
   void VisualServoingNode::poseEstimateCallback(const geometry_msgs::PoseStamped::ConstPtr& pose_msg) {
     // transform pose to base frame
-    // geometry_msgs::PoseStamped pose_msg_B;
-    // try 
-    // {
-    //   buffer_.transform(*pose_msg, pose_msg_B, "base");
-    // }
-    // catch (tf2::TransformException &ex)
-    // {
-    //   ROS_ERROR("[VisualServoingNode] %s", ex.what());
-    // }
-    // Eigen::Vector3d pole_pos_B = mav_msgs::vector3FromPointMsg(pose_msg_B.pose.position)
+    ROS_INFO_STREAM("[VisualServoingNode] poseEstimateCallback");
     Eigen::Vector3d pole_pos_C = mav_msgs::vector3FromPointMsg(pose_msg->pose.position);
     Eigen::Vector3d pole_pos_B = t_B_cam_ + R_B_cam_ * pole_pos_C;
 
@@ -56,6 +52,9 @@ namespace geranos {
     Eigen::Matrix3d R_W_B = current_odometry_.orientation_W_B.toRotationMatrix();
     current_pole_pos_ = current_odometry_.position_W + R_W_B * pole_pos_B;
     received_pole_pose_ = true;
+    geometry_msgs::Vector3 pole_pos_msg;
+    mav_msgs::vectorEigenToMsg(current_pole_pos_, &pole_pos_msg);
+    pole_pos_pub_.publish(pole_pos_msg);
   }
 
   void VisualServoingNode::poleViconCallback(const geometry_msgs::TransformStamped& pole_transform_msg) {
@@ -64,6 +63,7 @@ namespace geranos {
     current_pole_pos_vicon_ = pole_trajectory_point_.position_W;
     //calculate error from estimation
     if (received_pole_pose_) {
+      ROS_INFO_STREAM("[VisualServoingNode] Publishing error_vector");
       Eigen::Vector3d error_vector = current_pole_pos_vicon_ - current_pole_pos_;
       geometry_msgs::PointStamped error_msg;
       error_msg.header.stamp = ros::Time::now();
@@ -126,7 +126,7 @@ namespace geranos {
       }
   }
 
-  void VisualServoingNode::run() {
+  void VisualServoingNode::run(const ros::TimerEvent& event) {
     ROS_INFO_STREAM("[VisualServoingNode] RUNNING");
     mav_trajectory_generation::Trajectory trajectory;
     Eigen::Vector3d goal_vel;
@@ -135,22 +135,22 @@ namespace geranos {
     if (!received_odometry_ || !received_pole_pose_)
       return;
 
-    // if(!planTrajectory(current_pole_pos_, goal_vel, 
-    //                 current_odometry_.position_W, 
-    //                 current_odometry_.velocity_B,
-    //                 max_v_, max_a_, &trajectory)) {
-    //   ROS_ERROR_STREAM("[VisualServoingNode] Failed to plan Trajectory!");
-    //   return;
-    // }
-
-    //DEBUG WITH VICON POSITION
-    if(!planTrajectory(current_pole_pos_vicon_, goal_vel, 
+    if(!planTrajectory(current_pole_pos_, goal_vel, 
                     current_odometry_.position_W, 
                     current_odometry_.velocity_B,
                     max_v_, max_a_, &trajectory)) {
       ROS_ERROR_STREAM("[VisualServoingNode] Failed to plan Trajectory!");
       return;
     }
+
+    //DEBUG WITH VICON POSITION
+    // if(!planTrajectory(current_pole_pos_vicon_, goal_vel, 
+    //                 current_odometry_.position_W, 
+    //                 current_odometry_.velocity_B,
+    //                 max_v_, max_a_, &trajectory)) {
+    //   ROS_ERROR_STREAM("[VisualServoingNode] Failed to plan Trajectory!");
+    //   return;
+    // }
     // get markers to display them in RVIZ
     visualization_msgs::MarkerArray markers;
     double distance = 0.2; // Distance by which to seperate additional markers. Set 0.0 to disable.
@@ -246,14 +246,10 @@ int main(int argc, char** argv) {
   ros::init(argc, argv, "visual_servoing_node");
 
   ros::NodeHandle nh, private_nh("~");
-  ros::Rate rate(2); // Node Rate 2Hz
 
   auto Node = makeNode(nh, private_nh);
 
-  while (ros::ok()) {
-    Node->run();
-    rate.sleep();
-  }
+  ros::spin();
 
   return 0;
 }
