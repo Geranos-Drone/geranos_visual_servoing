@@ -27,7 +27,17 @@
 #include "tf2_ros/message_filter.h"
 #include "tf2_geometry_msgs/tf2_geometry_msgs.h"
 
+// srvs
+#include <std_srvs/Empty.h>
+
 namespace geranos {
+	enum TrajectoryState 
+	{
+		TRAJ_3D,
+		TRAJ_4D,
+		TRAJ_6D
+	};
+
 	class VisualServoingNode {
 	public:
 		VisualServoingNode(const ros::NodeHandle& nh, const ros::NodeHandle& private_nh);
@@ -38,6 +48,8 @@ namespace geranos {
 		void odometryCallback(const nav_msgs::OdometryConstPtr& odometry_msg);
 		void poseEstimateCallback(const geometry_msgs::PoseStamped::ConstPtr& pose_msg);
 		void poleViconCallback(const geometry_msgs::TransformStamped& pole_transform_msg);
+
+		bool activateServoingSrv(std_srvs::Empty::Request& request, std_srvs::Empty::Response& response);
 
 		void loadParams();
 		void loadTFs();
@@ -51,6 +63,9 @@ namespace geranos {
 	                          const Eigen::VectorXd& start_vel,
 	                          double v_max, double a_max,
 	                          mav_trajectory_generation::Trajectory* trajectory);
+		bool calc3DTrajectory(mav_trajectory_generation::Trajectory* trajectory);
+		bool calc4DTrajectory(mav_trajectory_generation::Trajectory* trajectory);
+		bool calc6DTrajectory(mav_trajectory_generation::Trajectory* trajectory);
 		void publishTrajectory(const mav_trajectory_generation::Trajectory& trajectory, const visualization_msgs::MarkerArray& markers);
 
 		ros::NodeHandle nh_;
@@ -65,6 +80,8 @@ namespace geranos {
 		ros::Publisher error_pub_;
 
 		ros::Timer timer_;
+
+		ros::ServiceServer activate_service_;
 
 		tf::TransformListener tf_listener_;
 	  	tf::StampedTransform tf_base_imu_;
@@ -83,6 +100,7 @@ namespace geranos {
 
 		bool received_odometry_;
 		bool received_pole_pose_;
+		bool activated_;
 
 		double max_v_; // m/s
 		double max_a_; // m/s^2
@@ -91,6 +109,7 @@ namespace geranos {
 		double sampling_time_;
 
 		mav_msgs::EigenTrajectoryPoint::Vector states_;
+		TrajectoryState traj_state_;
 
 	};
 }

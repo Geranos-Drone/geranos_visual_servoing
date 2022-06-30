@@ -15,12 +15,13 @@ namespace geranos {
     private_nh_(private_nh),
     tf2_(buffer_),
     received_odometry_(false),
-    received_pole_pose_(false) {
+    received_pole_pose_(false),
+    activated_(false) {
       odometry_sub_ = nh_.subscribe(mav_msgs::default_topics::ODOMETRY, 1, &VisualServoingNode::odometryCallback, this);
       pole_vicon_sub_ = nh_.subscribe("geranos_pole_white/vrpn_client/estimated_transform", 1, &VisualServoingNode::poleViconCallback, this);
       pose_estimate_sub_ = nh_.subscribe("PolePoseNode/EstimatedPose", 1, &VisualServoingNode::poseEstimateCallback, this);
       // create publisher for trajectory
-      pub_trajectory_ = nh_.advertise<trajectory_msgs::MultiDOFJointTrajectory>(ros::this_node::getName() + "/trajectory", 0);
+      pub_trajectory_ = nh_.advertise<trajectory_msgs::MultiDOFJointTrajectory>(mav_msgs::default_topics::COMMAND_TRAJECTORY, 0);
       // create publisher for estimated pole position
       pole_pos_pub_ = nh_.advertise<geometry_msgs::PointStamped>(ros::this_node::getName() + "/estimated_pole_position", 0);
       // create publisher for RVIZ markers
@@ -30,8 +31,12 @@ namespace geranos {
 
       timer_ = nh_.createTimer(ros::Duration(0.5), &VisualServoingNode::run, this);
 
+      activate_service_ = nh_.advertiseService("activate_servoing_service", &VisualServoingNode::activateServoingSrv, this);
+
       loadParams();
       loadTFs();
+
+      traj_state_ = TrajectoryState::TRAJ_3D;
     }
 
   VisualServoingNode::~VisualServoingNode() {}
@@ -53,7 +58,6 @@ namespace geranos {
 
   void VisualServoingNode::poseEstimateCallback(const geometry_msgs::PoseStamped::ConstPtr& pose_msg) {
     // transform pose to base frame
-    ROS_INFO_STREAM("[VisualServoingNode] poseEstimateCallback");
     Eigen::Vector3d pole_pos_C = mav_msgs::vector3FromPointMsg(pose_msg->pose.position);
     Eigen::Vector3d pole_pos_B = t_B_cam_ + R_B_cam_ * pole_pos_C;
 
@@ -72,7 +76,6 @@ namespace geranos {
     current_pole_pos_vicon_ = pole_trajectory_point_.position_W;
     //calculate error from estimation
     if (received_pole_pose_) {
-      ROS_INFO_STREAM("[VisualServoingNode] Publishing error_vector");
       Eigen::Vector3d error_vector = current_pole_pos_vicon_ - current_pole_pos_;
       geometry_msgs::PointStamped error_msg;
       getPointMsgFromEigen(error_vector, &error_msg);
@@ -130,32 +133,75 @@ namespace geranos {
         ROS_ERROR("[VisualServoingNode] %s",ex.what());
       }
   }
+  
+  bool VisualServoingNode::activateServoingSrv(std_srvs::Empty::Request& request, std_srvs::Empty::Response& response) {
+    if (activated_)
+      activated_ = false;
+    else 
+      activated_ = true;
+    return true;
+  }
+
+  bool VisualServoingNode::calc3DTrajectory(mav_trajectory_generation::Trajectory* trajectory){
+    Eigen::Vector3d start_pos, start_vel;
+    start_pos = current_odometry_.position_W;
+    start_vel = current_odometry_.velocity_B;
+
+    Eigen::Vector3d goal_pos, goal_vel;
+    goal_pos << current_pole_pos_vicon_(0), current_pole_pos_vicon_(1), current_pole_pos_vicon_(2) + 1.8;
+    goal_vel = Eigen::Vector3d::Zero();
+
+    return planTrajectory(goal_pos, goal_vel, start_pos, start_vel, max_v_, max_a_, trajectory);
+  }
+
+  bool VisualServoingNode::calc4DTrajectory(mav_trajectory_generation::Trajectory* trajectory){
+    double current_yaw = mav_msgs::yawFromQuaternion(current_odometry_.orientation_W_B);
+
+    Eigen::Vector4d start_pos, start_vel;
+    start_pos << current_odometry_.position_W, current_yaw;
+    start_vel << current_odometry_.velocity_B, current_odometry_.angular_velocity_B(2);
+
+    Eigen::Vector4d goal_vel, goal_pos;
+    goal_vel << 0.0, 0.0, 0.0, 0.0;
+    goal_pos << current_pole_pos_vicon_(0), current_pole_pos_vicon_(1), current_pole_pos_vicon_(2) + 1.8, current_yaw;
+
+    return planTrajectory(goal_pos, goal_vel, start_pos, start_vel, max_v_, max_a_, trajectory);
+
+  }
+  bool VisualServoingNode::calc6DTrajectory(mav_trajectory_generation::Trajectory* trajectory){
+    return true;
+  }
+
 
   void VisualServoingNode::run(const ros::TimerEvent& event) {
     ROS_INFO_STREAM("[VisualServoingNode] RUNNING");
-    mav_trajectory_generation::Trajectory trajectory;
-    Eigen::Vector3d goal_vel;
-    goal_vel << 0.0, 0.0, 0.0;
 
-    if (!received_odometry_ || !received_pole_pose_)
+    if (!received_odometry_ || !received_pole_pose_ || !activated_)
       return;
 
-    if(!planTrajectory(current_pole_pos_, goal_vel, 
-                    current_odometry_.position_W, 
-                    current_odometry_.velocity_B,
-                    max_v_, max_a_, &trajectory)) {
+    mav_trajectory_generation::Trajectory trajectory;
+
+    bool success = false;
+
+    switch(traj_state_) {
+      case TrajectoryState::TRAJ_3D:
+        success = calc3DTrajectory(&trajectory);
+        break;
+      case TrajectoryState::TRAJ_4D:
+        success = calc4DTrajectory(&trajectory);
+        break;
+      case TrajectoryState::TRAJ_6D:
+        success = calc6DTrajectory(&trajectory);
+        break;
+      default:
+        ROS_ERROR_STREAM("traj_state_ is set to wrong state");
+    }
+
+    if (!success) {
       ROS_ERROR_STREAM("[VisualServoingNode] Failed to plan Trajectory!");
       return;
     }
 
-    //DEBUG WITH VICON POSITION
-    // if(!planTrajectory(current_pole_pos_vicon_, goal_vel, 
-    //                 current_odometry_.position_W, 
-    //                 current_odometry_.velocity_B,
-    //                 max_v_, max_a_, &trajectory)) {
-    //   ROS_ERROR_STREAM("[VisualServoingNode] Failed to plan Trajectory!");
-    //   return;
-    // }
     // get markers to display them in RVIZ
     visualization_msgs::MarkerArray markers;
     double distance = 0.2; // Distance by which to seperate additional markers. Set 0.0 to disable.
@@ -179,7 +225,6 @@ namespace geranos {
     ROS_INFO_STREAM("[VisualServoingNode] PLAN TRAJECTORY");
     assert(trajectory);
     const int dimension = goal_pos.size();
-    assert(dimension == 3);
     // Array for all waypoints and their constraints
     mav_trajectory_generation::Vertex::Vector vertices;
 
