@@ -212,6 +212,16 @@ namespace geranos {
     states_.clear();
     mav_trajectory_generation::sampleWholeTrajectory(trajectory, sampling_time_, &states_);
 
+    // set yaw manually for 3D Trajectory
+    if (traj_state_ == TrajectoryState::TRAJ_3D) {
+      double current_yaw = mav_msgs::yawFromQuaternion(current_odometry_.orientation_W_B);
+      for (auto state : states_) {
+       ROS_INFO_STREAM("Yaw before = " << state.getYaw());
+       state.setFromYaw(current_yaw);
+       ROS_INFO_STREAM("Yaw after = " << state.getYaw());
+      }
+    }
+
     publishTrajectory(trajectory, markers);
   }
 
