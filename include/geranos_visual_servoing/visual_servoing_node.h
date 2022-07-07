@@ -31,6 +31,8 @@
 // srvs
 #include <std_srvs/Empty.h>
 
+#define M_PI 3.14159265358979323846
+
 namespace geranos {
 	enum TrajectoryState 
 	{
@@ -67,7 +69,7 @@ namespace geranos {
 		bool calc3DTrajectory(mav_trajectory_generation::Trajectory* trajectory);
 		bool calc4DTrajectory(mav_trajectory_generation::Trajectory* trajectory);
 		bool calc6DTrajectory(mav_trajectory_generation::Trajectory* trajectory);
-		void publishTrajectory(const mav_trajectory_generation::Trajectory& trajectory, const visualization_msgs::MarkerArray& markers);
+		void publishTrajectory(const visualization_msgs::MarkerArray& markers);
 
 		ros::NodeHandle nh_;
 		ros::NodeHandle private_nh_;
@@ -96,6 +98,7 @@ namespace geranos {
 
 		mav_msgs::EigenOdometry current_odometry_;
 		Eigen::Vector3d current_pole_pos_;
+		Eigen::Vector3d current_pole_pos_B_;
 		mav_msgs::EigenTrajectoryPoint pole_trajectory_point_;
 		Eigen::Vector3d current_pole_pos_vicon_;
 

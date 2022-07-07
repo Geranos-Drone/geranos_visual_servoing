@@ -69,6 +69,7 @@ namespace geranos {
     // transform pose to base frame
     Eigen::Vector3d pole_pos_C = mav_msgs::vector3FromPointMsg(pose_msg->pose.position);
     Eigen::Vector3d pole_pos_B = t_B_cam_ + R_B_cam_ * pole_pos_C;
+    current_pole_pos_B_ = pole_pos_B;
 
     // transform position to world frame
     Eigen::Matrix3d R_W_B = current_odometry_.orientation_W_B.toRotationMatrix();
@@ -195,49 +196,55 @@ namespace geranos {
 
     ROS_INFO_STREAM("[VisualServoingNode] RUNNING");
 
-    mav_trajectory_generation::Trajectory trajectory;
+    // get unit vector into direction of pole
+    Eigen::Vector3d goal = current_pole_pos_vicon_ + Eigen::Vector3d(0.0, 0.0, 1.8);
+    Eigen::Vector3d diff = goal - current_odometry_.position_W;
+    Eigen::Vector3d direction = diff.normalized();
+    double distance = diff.norm();
 
-    bool success = false;
+    // get difference in yaw
+    double yaw_cam = 120.0 / 180.0 * M_PI;
+    double yaw_diff = (atan2(current_pole_pos_B_(0), current_pole_pos_B_(1)) + yaw_cam) * 0.2;
 
-    switch(traj_state_) {
-      case TrajectoryState::TRAJ_3D:
-        success = calc3DTrajectory(&trajectory);
-        break;
-      case TrajectoryState::TRAJ_4D:
-        success = calc4DTrajectory(&trajectory);
-        break;
-      case TrajectoryState::TRAJ_6D:
-        success = calc6DTrajectory(&trajectory);
-        break;
-      default:
-        ROS_ERROR_STREAM("traj_state_ is set to wrong state");
-    }
+    double carrot_distance = 0.05;
+    if (distance < 0.1)
+      carrot_distance = distance * 0.2;
 
-    if (!success) {
-      ROS_ERROR_STREAM("[VisualServoingNode] Failed to plan Trajectory!");
-      return;
-    }
-    
-    // Sample:
-    states_.clear();
-    mav_trajectory_generation::sampleWholeTrajectory(trajectory, sampling_time_, &states_);
+    Eigen::Vector3d desired_position = current_odometry_.position_W + carrot_distance * direction;
+    double desired_yaw = mav_msgs::yawFromQuaternion(current_odometry_.orientation_W_B) + yaw_diff;
+    Eigen::Quaterniond desired_orientation = mav_msgs::quaternionFromYaw(desired_yaw);
 
-    // set yaw manually for 3D Trajectory
-    if (traj_state_ == TrajectoryState::TRAJ_3D) {
-      for (auto state : states_) {
-       ROS_INFO_STREAM("Yaw before = " << state.getYaw());
-       state.setFromYaw(current_yaw_);
-       ROS_INFO_STREAM("Yaw after = " << state.getYaw());
-      }
-    }
+    trajectory_msgs::MultiDOFJointTrajectory trajectory_msg;
+    trajectory_msg.header.stamp = ros::Time::now();
+    trajectory_msg.header.frame_id = "world";
+
+    Eigen::Vector3d velocity_des(0.0, 0.0, 0.0);
+    Eigen::Vector3d acceleration_des(0.0, 0.0, 0.0);
+    Eigen::Vector3d jerk_des(0.0, 0.0, 0.0);
+    Eigen::Vector3d snap_des(0.0, 0.0, 0.0);
+    Eigen::Vector3d angular_velocity_des(0.0, 0.0, 0.0);
+    Eigen::Vector3d angular_accel_des(0.0, 0.0, 0.0);
+    Eigen::Vector3d force_des(0.0, 0.0, 0.0);
+    Eigen::Vector3d torque_des(0.0, 0.0, 0.0);
+
+    mav_msgs::EigenTrajectoryPoint trajectory_point(
+        0.0, desired_position, velocity_des, acceleration_des, jerk_des, snap_des,
+        desired_orientation, angular_velocity_des, angular_accel_des, force_des, torque_des);
+
+    mav_msgs::msgMultiDofJointTrajectoryFromEigen(trajectory_point, &trajectory_msg);
+
+    pub_trajectory_.publish(trajectory_msg);
+
+    states_.clear();  
+    states_.push_back(trajectory_point);
 
     // get markers to display them in RVIZ
     visualization_msgs::MarkerArray markers;
-    double distance = 0.2; // Distance by which to seperate additional markers. Set 0.0 to disable.
+    double marker_distance = 0.02; // Distance by which to seperate additional markers. Set 0.0 to disable.
     std::string frame_id = "world";
-    mav_trajectory_generation::drawMavSampledTrajectory(states_, distance, frame_id, &markers);
+    mav_trajectory_generation::drawMavSampledTrajectory(states_, marker_distance, frame_id, &markers);
 
-    publishTrajectory(trajectory, markers);
+    pub_markers_.publish(markers);
   }
 
   // Plans a trajectory from a start position and velocity to a goal position and velocity
@@ -307,14 +314,6 @@ namespace geranos {
     return true;
   }
 
-  void VisualServoingNode::publishTrajectory(const mav_trajectory_generation::Trajectory& trajectory, const visualization_msgs::MarkerArray& markers) {
-    pub_markers_.publish(markers);
-    trajectory_msgs::MultiDOFJointTrajectory trajectory_msg;
-    mav_msgs::msgMultiDofJointTrajectoryFromEigen(states_, &trajectory_msg);
-    trajectory_msg.header.frame_id = "world";
-    trajectory_msg.header.stamp = ros::Time::now();
-    pub_trajectory_.publish(trajectory_msg);
-  }
 } //namespace geranos
 
 template<typename... Ts>
