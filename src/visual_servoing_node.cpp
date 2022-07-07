@@ -29,7 +29,7 @@ namespace geranos {
       // create publisher for estimation error
       error_pub_ = nh_.advertise<geometry_msgs::PointStamped>(ros::this_node::getName() + "/error_vector", 0);
 
-      timer_ = nh_.createTimer(ros::Duration(0.5), &VisualServoingNode::run, this);
+      timer_ = nh_.createTimer(ros::Duration(1.0), &VisualServoingNode::run, this);
 
       activate_service_ = nh_.advertiseService("activate_servoing_service", &VisualServoingNode::activateServoingSrv, this);
 
@@ -37,23 +37,32 @@ namespace geranos {
       loadTFs();
 
       traj_state_ = TrajectoryState::TRAJ_3D;
+
+      states_.clear();
     }
 
   VisualServoingNode::~VisualServoingNode() {}
 
   void VisualServoingNode::odometryCallback(const nav_msgs::OdometryConstPtr& odometry_msg) {
     ROS_INFO_ONCE("VisualServoingNode received first odometry!");
-    mav_msgs::eigenOdometryFromMsg(*odometry_msg, &current_odometry_);
-    transformOdometry(current_odometry_);
+    mav_msgs::EigenOdometry odom;
+    mav_msgs::eigenOdometryFromMsg(*odometry_msg, &odom);
+    transformOdometry(odom);
+    current_odometry_ = odom;
     received_odometry_ = true;
   }
 
   void VisualServoingNode::transformOdometry(mav_msgs::EigenOdometry& odometry) {
     Eigen::Matrix3d R_B_imu = T_B_imu_.rotation();  // rotation from imu to body frame
-    Eigen::Vector3d r_B_imu_imu = T_B_imu_.translation();  // body to imu offset expressed in base frame
+    Eigen::Vector3d r_B_imu_B = T_B_imu_.translation();  // body to imu offset expressed in base frame
     Eigen::Matrix3d R_W_B = odometry.orientation_W_B.toRotationMatrix();
     // add translational offset between imu and body frame
-    odometry.position_W -= R_W_B * R_B_imu * r_B_imu_imu;
+    odometry.position_W -= R_W_B * R_B_imu * r_B_imu_B;
+
+    // transform velocity 
+    Eigen::Vector3d v_rot = odometry.angular_velocity_B.cross(r_B_imu_B);
+    // rotate velocity vector into body frame and add rotational contribution
+    odometry.velocity_B = R_B_imu * odometry.velocity_B - v_rot;
   }
 
   void VisualServoingNode::poseEstimateCallback(const geometry_msgs::PoseStamped::ConstPtr& pose_msg) {
@@ -65,6 +74,8 @@ namespace geranos {
     Eigen::Matrix3d R_W_B = current_odometry_.orientation_W_B.toRotationMatrix();
     current_pole_pos_ = current_odometry_.position_W + R_W_B * pole_pos_B;
     received_pole_pose_ = true;
+
+    // publish pole position
     geometry_msgs::PointStamped pole_pos_msg;
     getPointMsgFromEigen(current_pole_pos_, &pole_pos_msg);
     pole_pos_pub_.publish(pole_pos_msg);
@@ -74,6 +85,7 @@ namespace geranos {
     ROS_INFO_ONCE("[VisualServoingNode] Received first transform of Pole!");
     mav_msgs::eigenTrajectoryPointFromTransformMsg(pole_transform_msg, &pole_trajectory_point_);
     current_pole_pos_vicon_ = pole_trajectory_point_.position_W;
+    
     //calculate error from estimation
     if (received_pole_pose_) {
       Eigen::Vector3d error_vector = current_pole_pos_vicon_ - current_pole_pos_;
@@ -135,6 +147,7 @@ namespace geranos {
   }
   
   bool VisualServoingNode::activateServoingSrv(std_srvs::Empty::Request& request, std_srvs::Empty::Response& response) {
+    current_yaw_ = mav_msgs::yawFromQuaternion(current_odometry_.orientation_W_B);
     if (activated_)
       activated_ = false;
     else 
@@ -143,9 +156,11 @@ namespace geranos {
   }
 
   bool VisualServoingNode::calc3DTrajectory(mav_trajectory_generation::Trajectory* trajectory){
+    Eigen::Matrix3d R_W_B = current_odometry_.orientation_W_B.toRotationMatrix();
+
     Eigen::Vector3d start_pos, start_vel;
     start_pos = current_odometry_.position_W;
-    start_vel = current_odometry_.velocity_B;
+    start_vel = R_W_B * current_odometry_.velocity_B;
 
     Eigen::Vector3d goal_pos, goal_vel;
     goal_pos << current_pole_pos_vicon_(0), current_pole_pos_vicon_(1), current_pole_pos_vicon_(2) + 1.8;
@@ -174,10 +189,11 @@ namespace geranos {
 
 
   void VisualServoingNode::run(const ros::TimerEvent& event) {
-    ROS_INFO_STREAM("[VisualServoingNode] RUNNING");
 
-    if (!received_odometry_ || !received_pole_pose_ || !activated_)
+    if (!received_odometry_  || !activated_)
       return;
+
+    ROS_INFO_STREAM("[VisualServoingNode] RUNNING");
 
     mav_trajectory_generation::Trajectory trajectory;
 
@@ -201,12 +217,6 @@ namespace geranos {
       ROS_ERROR_STREAM("[VisualServoingNode] Failed to plan Trajectory!");
       return;
     }
-
-    // get markers to display them in RVIZ
-    visualization_msgs::MarkerArray markers;
-    double distance = 0.2; // Distance by which to seperate additional markers. Set 0.0 to disable.
-    std::string frame_id = "world";
-    mav_trajectory_generation::drawMavTrajectory(trajectory, distance, frame_id, &markers);
     
     // Sample:
     states_.clear();
@@ -214,13 +224,18 @@ namespace geranos {
 
     // set yaw manually for 3D Trajectory
     if (traj_state_ == TrajectoryState::TRAJ_3D) {
-      double current_yaw = mav_msgs::yawFromQuaternion(current_odometry_.orientation_W_B);
       for (auto state : states_) {
        ROS_INFO_STREAM("Yaw before = " << state.getYaw());
-       state.setFromYaw(current_yaw);
+       state.setFromYaw(current_yaw_);
        ROS_INFO_STREAM("Yaw after = " << state.getYaw());
       }
     }
+
+    // get markers to display them in RVIZ
+    visualization_msgs::MarkerArray markers;
+    double distance = 0.2; // Distance by which to seperate additional markers. Set 0.0 to disable.
+    std::string frame_id = "world";
+    mav_trajectory_generation::drawMavSampledTrajectory(states_, distance, frame_id, &markers);
 
     publishTrajectory(trajectory, markers);
   }
@@ -265,19 +280,25 @@ namespace geranos {
     segment_times = estimateSegmentTimes(vertices, v_max, a_max);
 
     // Set up polynomial solver with default params
-    mav_trajectory_generation::NonlinearOptimizationParameters parameters;
+    // mav_trajectory_generation::NonlinearOptimizationParameters parameters;
 
-    // set up optimization problem
+    // // set up optimization problem
+    // const int N = 10;
+    // mav_trajectory_generation::PolynomialOptimizationNonLinear<N> opt(dimension, parameters);
+    // opt.setupFromVertices(vertices, segment_times, derivative_to_optimize);
+
+    // // constrain velocity and acceleration
+    // opt.addMaximumMagnitudeConstraint(mav_trajectory_generation::derivative_order::VELOCITY, v_max);
+    // opt.addMaximumMagnitudeConstraint(mav_trajectory_generation::derivative_order::ACCELERATION, a_max);
+
+    // // solve trajectory
+    // opt.optimize();
+
+    // Linear Optimization
     const int N = 10;
-    mav_trajectory_generation::PolynomialOptimizationNonLinear<N> opt(dimension, parameters);
+    mav_trajectory_generation::PolynomialOptimization<N> opt(dimension);
     opt.setupFromVertices(vertices, segment_times, derivative_to_optimize);
-
-    // constrain velocity and acceleration
-    opt.addMaximumMagnitudeConstraint(mav_trajectory_generation::derivative_order::VELOCITY, v_max);
-    opt.addMaximumMagnitudeConstraint(mav_trajectory_generation::derivative_order::ACCELERATION, a_max);
-
-    // solve trajectory
-    opt.optimize();
+    opt.solveLinear();
 
     // get trajectory as polynomial parameters
     opt.getTrajectory(&(*trajectory));
