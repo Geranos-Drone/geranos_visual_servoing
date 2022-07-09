@@ -112,7 +112,7 @@ namespace geranos {
     Eigen::Quaterniond waypoint_orientation = mav_msgs::quaternionFromYaw(start_yaw_);
     Eigen::Vector3d velocity_command (0.0, 0.0, 0.0);
     Eigen::Vector3d ang_velocity_command (0.0, 0.0, 0.0);
-    double duration = 5.0;
+    double duration = 5e9;
     trajectory_msgs::MultiDOFJointTrajectory trajectory_msg;
     generateTrajectoryMsg(trajectory_msg, waypoint_position, 
                           waypoint_orientation, velocity_command, 
@@ -136,7 +136,7 @@ namespace geranos {
     Eigen::Quaterniond waypoint_orientation = mav_msgs::quaternionFromYaw(start_yaw_);
     Eigen::Vector3d velocity_command (0.0, 0.0, 0.0);
     Eigen::Vector3d ang_velocity_command (0.0, 0.0, 0.0);
-    double duration = 5.0;
+    double duration = 5e9;
     trajectory_msgs::MultiDOFJointTrajectory trajectory_msg;
     generateTrajectoryMsg(trajectory_msg, waypoint_position, 
                           waypoint_orientation, velocity_command, 
