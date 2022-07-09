@@ -255,9 +255,9 @@ namespace geranos {
     double yaw_velocity_command;
 
     double yaw_cam = - 2 / 3 * M_PI;
-    double ang_error = atan2(current_pole_pos_B_(0), current_pole_pos_B_(1)) + yaw_cam;
+    double ang_error = std::atan2(current_pole_pos_B_(0), current_pole_pos_B_(1)) + yaw_cam;
 
-    ROS_INFO_STREAM("atan2 = " << atan2(current_pole_pos_B_(0), current_pole_pos_B_(1)));
+    ROS_INFO_STREAM("atan2 = " << std::atan2(current_pole_pos_B_(0), current_pole_pos_B_(1)));
 
     if(ang_error > M_PI){
       ang_error = ang_error - 2 * M_PI;
