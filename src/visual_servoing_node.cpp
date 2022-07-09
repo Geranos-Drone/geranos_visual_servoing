@@ -173,7 +173,7 @@ namespace geranos {
       ROS_WARN("[VisualServoingNode] param k_p not found");
     }
     if (!nh_.getParam(ros::this_node::getName() + "/k_p_ang", k_p_ang_)){
-      ROS_WARN("[VisualServoingNode] param k_p not found");
+      ROS_WARN("[VisualServoingNode] param k_p_ang not found");
     }
   }
 
@@ -268,6 +268,8 @@ namespace geranos {
     } else {
       yaw_velocity_command = ang_error * k_p_ang_;
     }
+
+    ROS_INFO_STREAM("yaw_velocity_command = " << yaw_velocity_command);
 
     angular_velocity_integral_ += yaw_velocity_command * sampling_time;
 
