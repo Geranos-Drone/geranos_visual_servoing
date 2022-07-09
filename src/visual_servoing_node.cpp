@@ -214,6 +214,7 @@ namespace geranos {
     start_yaw_ = mav_msgs::yawFromQuaternion(current_odometry_.orientation_W_B);
     start_position_ = current_odometry_.position_W;
     velocity_integral_ = Eigen::Vector3d::Zero();
+    angular_velocity_integral_ = 0.0;
     t_last_run_ = ros::Time::now();
 
     if (activated_){
