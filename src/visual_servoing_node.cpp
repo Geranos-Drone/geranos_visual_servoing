@@ -109,7 +109,7 @@ namespace geranos {
       activated_ = false;
     }
     Eigen::Vector3d waypoint_position = current_odometry_.position_W - Eigen::Vector3d(0.0, 0.0, 1.1);
-    Eigen::Quaterniond waypoint_orientation = mav_msgs::quaternionFromYaw(current_yaw_);
+    Eigen::Quaterniond waypoint_orientation = mav_msgs::quaternionFromYaw(start_yaw_);
     Eigen::Vector3d velocity_command (0.0, 0.0, 0.0);
     Eigen::Vector3d ang_velocity_command (0.0, 0.0, 0.0);
     double duration = 5.0;
@@ -133,7 +133,7 @@ namespace geranos {
       activated_ = false;
     }
     Eigen::Vector3d waypoint_position = current_odometry_.position_W + Eigen::Vector3d(0.0, 0.0, 1.1);
-    Eigen::Quaterniond waypoint_orientation = mav_msgs::quaternionFromYaw(current_yaw_);
+    Eigen::Quaterniond waypoint_orientation = mav_msgs::quaternionFromYaw(start_yaw_);
     Eigen::Vector3d velocity_command (0.0, 0.0, 0.0);
     Eigen::Vector3d ang_velocity_command (0.0, 0.0, 0.0);
     double duration = 5.0;
@@ -211,7 +211,7 @@ namespace geranos {
   }
   
   bool VisualServoingNode::activateServoingSrv(std_srvs::Empty::Request& request, std_srvs::Empty::Response& response) {
-    current_yaw_ = mav_msgs::yawFromQuaternion(current_odometry_.orientation_W_B);
+    start_yaw_ = mav_msgs::yawFromQuaternion(current_odometry_.orientation_W_B);
     start_position_ = current_odometry_.position_W;
     velocity_integral_ = Eigen::Vector3d::Zero();
     t_last_run_ = ros::Time::now();
