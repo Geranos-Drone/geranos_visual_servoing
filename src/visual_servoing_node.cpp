@@ -208,8 +208,6 @@ namespace geranos {
     double sampling_time = (t_now - t_last_run_).toSec();
     t_last_run_ = t_now;
 
-    ROS_INFO_STREAM("sampling_time = " << sampling_time);
-
     Eigen::Vector3d velocity_command = error * k_p_;
 
     velocity_integral_ += velocity_command * sampling_time;
@@ -218,14 +216,11 @@ namespace geranos {
     // double yaw_cam = 120.0 / 180.0 * M_PI;
     // double yaw_diff = (atan2(current_pole_pos_B_(0), current_pole_pos_B_(1)) + yaw_cam) * 0.2;
 
-    // v = k * diff
-    // waypoint position += v 
-
     waypoint_position_ = start_position_ + velocity_integral_;
     // double desired_yaw = mav_msgs::yawFromQuaternion(current_odometry_.orientation_W_B) + yaw_diff;
     // waypoint_orientation_ = mav_msgs::quaternionFromYaw(desired_yaw);
     // debug
-    waypoint_orientation_ = mav_msgs::quaternionFromYaw(mav_msgs::yawFromQuaternion(current_odometry_.orientation_W_B));
+    waypoint_orientation_ = mav_msgs::quaternionFromYaw(current_yaw_);
 
     // ROS_INFO_STREAM("[VisualServoingNode] RUNNING");
 
