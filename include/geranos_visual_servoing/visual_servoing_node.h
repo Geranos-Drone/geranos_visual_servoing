@@ -12,12 +12,11 @@
 #include <trajectory_msgs/MultiDOFJointTrajectory.h>
 
 // Trajectories
-#include <mav_trajectory_generation/trajectory.h>
-#include <mav_trajectory_generation/polynomial_optimization_linear.h>
-// #include <mav_trajectory_generation/polynomial_optimization_nonlinear.h>
 #include <mav_trajectory_generation_ros/ros_conversions.h>
 #include <mav_trajectory_generation_ros/ros_visualization.h>
 #include <mav_trajectory_generation/trajectory_sampling.h>
+#include <omav_local_planner/ExecuteTrajectory.h>
+
 
 // tf
 #include <tf/transform_listener.h>
@@ -47,13 +46,17 @@ namespace geranos {
 		~VisualServoingNode();
 
 		void run(const ros::TimerEvent& event);
-		void updateWaypoint(const ros::TimerEvent& event);
 	private:
+		void initializeSubscribers();
+		void initializePublishers();
+		void initializeServices();
 		void odometryCallback(const nav_msgs::OdometryConstPtr& odometry_msg);
 		void poseEstimateCallback(const geometry_msgs::PoseStamped::ConstPtr& pose_msg);
 		void poleViconCallback(const geometry_msgs::TransformStamped& pole_transform_msg);
 
 		bool activateServoingSrv(std_srvs::Empty::Request& request, std_srvs::Empty::Response& response);
+	  	bool grabPoleSrv(std_srvs::Empty::Request& request, std_srvs::Empty::Response& response);
+  		bool liftPoleSrv(std_srvs::Empty::Request& request, std_srvs::Empty::Response& response);
 
 		void loadParams();
 		void loadTFs();
@@ -61,16 +64,7 @@ namespace geranos {
 		void transformPose();
 		void transformOdometry(mav_msgs::EigenOdometry& odometry);
 
-		bool planTrajectory(const Eigen::VectorXd& goal_pos,
-	                          const Eigen::VectorXd& goal_vel,
-	                          const Eigen::VectorXd& start_pos,
-	                          const Eigen::VectorXd& start_vel,
-	                          double v_max, double a_max,
-	                          mav_trajectory_generation::Trajectory* trajectory);
-		bool calc3DTrajectory(mav_trajectory_generation::Trajectory* trajectory);
-		bool calc4DTrajectory(mav_trajectory_generation::Trajectory* trajectory);
-		bool calc6DTrajectory(mav_trajectory_generation::Trajectory* trajectory);
-		void publishTrajectory(const visualization_msgs::MarkerArray& markers);
+
 
 		ros::NodeHandle nh_;
 		ros::NodeHandle private_nh_;
@@ -87,6 +81,8 @@ namespace geranos {
 		ros::Timer timer_update_;
 
 		ros::ServiceServer activate_service_;
+		ros::ServiceServer grab_pole_service_;
+		ros::ServiceServer lift_pole_service_;
 
 		tf::TransformListener tf_listener_;
 	  	tf::StampedTransform tf_base_imu_;

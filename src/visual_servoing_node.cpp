@@ -17,31 +17,39 @@ namespace geranos {
     received_odometry_(false),
     received_pole_pose_(false),
     activated_(false) {
-      odometry_sub_ = nh_.subscribe(mav_msgs::default_topics::ODOMETRY, 1, &VisualServoingNode::odometryCallback, this);
-      pole_vicon_sub_ = nh_.subscribe("geranos_pole_white/vrpn_client/estimated_transform", 1, &VisualServoingNode::poleViconCallback, this);
-      pose_estimate_sub_ = nh_.subscribe("PolePoseNode/EstimatedPose", 1, &VisualServoingNode::poseEstimateCallback, this);
-      // create publisher for trajectory
-      pub_trajectory_ = nh_.advertise<trajectory_msgs::MultiDOFJointTrajectory>(mav_msgs::default_topics::COMMAND_TRAJECTORY, 0);
-      // create publisher for estimated pole position
-      pole_pos_pub_ = nh_.advertise<geometry_msgs::PointStamped>(ros::this_node::getName() + "/estimated_pole_position", 0);
-      // create publisher for RVIZ markers
-      pub_markers_ = nh_.advertise<visualization_msgs::MarkerArray>(ros::this_node::getName() + "/trajectory_markers", 0);
-      // create publisher for estimation error
-      error_pub_ = nh_.advertise<geometry_msgs::PointStamped>(ros::this_node::getName() + "/error_vector", 0);
-
-      timer_run_ = nh_.createTimer(ros::Duration(1.0/200.0), &VisualServoingNode::run, this);
-
-      activate_service_ = nh_.advertiseService("activate_servoing_service", &VisualServoingNode::activateServoingSrv, this);
-
+      initializeSubscribers();
+      initializePublishers();
+      initializeServices();
       loadParams();
-      loadTFs();
-
-      traj_state_ = TrajectoryState::TRAJ_3D;
-
+      loadTFs();  
+      timer_run_ = nh_.createTimer(ros::Duration(1.0/200.0), &VisualServoingNode::run, this);
       states_.clear();
     }
 
   VisualServoingNode::~VisualServoingNode() {}
+
+  void VisualServoingNode::initializeSubscribers() {
+    odometry_sub_ = nh_.subscribe(mav_msgs::default_topics::ODOMETRY, 1, &VisualServoingNode::odometryCallback, this);
+    pole_vicon_sub_ = nh_.subscribe("geranos_pole_white/vrpn_client/estimated_transform", 1, &VisualServoingNode::poleViconCallback, this);
+    pose_estimate_sub_ = nh_.subscribe("PolePoseNode/EstimatedPose", 1, &VisualServoingNode::poseEstimateCallback, this);    
+  }
+
+  void VisualServoingNode::initializePublishers() {
+    // create publisher for trajectory
+    pub_trajectory_ = nh_.advertise<trajectory_msgs::MultiDOFJointTrajectory>(mav_msgs::default_topics::COMMAND_TRAJECTORY, 0);
+    // create publisher for estimated pole position
+    pole_pos_pub_ = nh_.advertise<geometry_msgs::PointStamped>(ros::this_node::getName() + "/estimated_pole_position", 0);
+    // create publisher for RVIZ markers
+    pub_markers_ = nh_.advertise<visualization_msgs::MarkerArray>(ros::this_node::getName() + "/trajectory_markers", 0);
+    // create publisher for estimation error
+    error_pub_ = nh_.advertise<geometry_msgs::PointStamped>(ros::this_node::getName() + "/error_vector", 0);    
+  }
+
+  void VisualServoingNode::initializeServices() {
+    activate_service_ = nh_.advertiseService("activate_servoing_service", &VisualServoingNode::activateServoingSrv, this);
+    grab_pole_service_ = nh_.advertiseService("grab_pole_service", &VisualServoingNode::grabPoleSrv, this);
+    lift_pole_service_ = nh_.advertiseService("lift_pole_service", &VisualServoingNode::liftPoleSrv, this);
+  }
 
   void VisualServoingNode::odometryCallback(const nav_msgs::OdometryConstPtr& odometry_msg) {
     ROS_INFO_ONCE("VisualServoingNode received first odometry!");
@@ -95,6 +103,15 @@ namespace geranos {
       error_pub_.publish(error_msg);
     }
   }
+
+  bool VisualServoingNode::grabPoleSrv(std_srvs::Empty::Request& request, std_srvs::Empty::Response& response) {
+    return true;
+  }
+
+  bool VisualServoingNode::liftPoleSrv(std_srvs::Empty::Request& request, std_srvs::Empty::Response& response) {
+    return true;
+  }
+
 
   void VisualServoingNode::loadParams() {
     if (!nh_.getParam(ros::this_node::getName() + "/max_v", max_v_)){
@@ -156,42 +173,14 @@ namespace geranos {
     velocity_integral_ = Eigen::Vector3d::Zero();
     t_last_run_ = ros::Time::now();
 
-    if (activated_)
+    if (activated_){
+      ROS_INFO_STREAM("[VisualServoingNode] DE-ACTIVATED SERVOING");
       activated_ = false;
-    else 
+    }
+    else {
+      ROS_INFO_STREAM("[VisualServoingNode] ACTIVATED SERVOING");
       activated_ = true;
-    return true;
-  }
-
-  bool VisualServoingNode::calc3DTrajectory(mav_trajectory_generation::Trajectory* trajectory){
-    Eigen::Matrix3d R_W_B = current_odometry_.orientation_W_B.toRotationMatrix();
-
-    Eigen::Vector3d start_pos, start_vel;
-    start_pos = current_odometry_.position_W;
-    start_vel = R_W_B * current_odometry_.velocity_B;
-
-    Eigen::Vector3d goal_pos, goal_vel;
-    goal_pos << current_pole_pos_vicon_(0), current_pole_pos_vicon_(1), current_pole_pos_vicon_(2) + 1.8;
-    goal_vel = Eigen::Vector3d::Zero();
-
-    return planTrajectory(goal_pos, goal_vel, start_pos, start_vel, max_v_, max_a_, trajectory);
-  }
-
-  bool VisualServoingNode::calc4DTrajectory(mav_trajectory_generation::Trajectory* trajectory){
-    double current_yaw = mav_msgs::yawFromQuaternion(current_odometry_.orientation_W_B);
-
-    Eigen::Vector4d start_pos, start_vel;
-    start_pos << current_odometry_.position_W, current_yaw;
-    start_vel << current_odometry_.velocity_B, current_odometry_.angular_velocity_B(2);
-
-    Eigen::Vector4d goal_vel, goal_pos;
-    goal_vel << 0.0, 0.0, 0.0, 0.0;
-    goal_pos << current_pole_pos_vicon_(0), current_pole_pos_vicon_(1), current_pole_pos_vicon_(2) + 1.8, current_yaw;
-
-    return planTrajectory(goal_pos, goal_vel, start_pos, start_vel, max_v_, max_a_, trajectory);
-
-  }
-  bool VisualServoingNode::calc6DTrajectory(mav_trajectory_generation::Trajectory* trajectory){
+    }
     return true;
   }
 
@@ -221,8 +210,6 @@ namespace geranos {
     // waypoint_orientation_ = mav_msgs::quaternionFromYaw(desired_yaw);
     // debug
     waypoint_orientation_ = mav_msgs::quaternionFromYaw(current_yaw_);
-
-    // ROS_INFO_STREAM("[VisualServoingNode] RUNNING");
 
     trajectory_msgs::MultiDOFJointTrajectory trajectory_msg;
     trajectory_msg.header.stamp = ros::Time::now();
@@ -257,98 +244,6 @@ namespace geranos {
     mav_trajectory_generation::drawMavSampledTrajectory(states_, marker_distance, frame_id, &markers);
 
     pub_markers_.publish(markers);
-  }
-
-  void VisualServoingNode::updateWaypoint(const ros::TimerEvent& event) {
-    // get unit vector into direction of pole
-    Eigen::Vector3d goal = current_pole_pos_vicon_ + Eigen::Vector3d(0.0, 0.0, 1.8);
-    Eigen::Vector3d diff = goal - current_odometry_.position_W;
-    Eigen::Vector3d direction = diff.normalized();
-    double distance = diff.norm();
-
-    // get difference in yaw
-    // double yaw_cam = 120.0 / 180.0 * M_PI;
-    // double yaw_diff = (atan2(current_pole_pos_B_(0), current_pole_pos_B_(1)) + yaw_cam) * 0.2;
-
-    // v = k * diff
-    // waypoint position += v 
-
-    double carrot_distance = 0.2;
-    if (distance < 0.1)
-      carrot_distance = distance * 0.2;
-
-    waypoint_position_ = current_odometry_.position_W + carrot_distance * direction;
-    // double desired_yaw = mav_msgs::yawFromQuaternion(current_odometry_.orientation_W_B) + yaw_diff;
-    // waypoint_orientation_ = mav_msgs::quaternionFromYaw(desired_yaw);
-    // debug
-    waypoint_orientation_ = mav_msgs::quaternionFromYaw(mav_msgs::yawFromQuaternion(current_odometry_.orientation_W_B));
-  }
-
-  // Plans a trajectory from a start position and velocity to a goal position and velocity
-  bool VisualServoingNode::planTrajectory(const Eigen::VectorXd& goal_pos,
-                                      const Eigen::VectorXd& goal_vel,
-                                      const Eigen::VectorXd& start_pos,
-                                      const Eigen::VectorXd& start_vel,
-                                      double v_max, double a_max,
-                                      mav_trajectory_generation::Trajectory* trajectory) {
-    ROS_INFO_STREAM("[VisualServoingNode] PLAN TRAJECTORY");
-    assert(trajectory);
-    const int dimension = goal_pos.size();
-    // Array for all waypoints and their constraints
-    mav_trajectory_generation::Vertex::Vector vertices;
-
-    // Optimze up to 4th order derivative (SNAP)
-    const int derivative_to_optimize =
-        mav_trajectory_generation::derivative_order::SNAP;
-
-    // we have 2 vertices:
-    // start = desired start vector
-    // end = desired end vector
-    mav_trajectory_generation::Vertex start(dimension), end(dimension);
-
-    /******* Configure start point *******/
-    start.makeStartOrEnd(start_pos, derivative_to_optimize);
-    start.addConstraint(mav_trajectory_generation::derivative_order::VELOCITY,
-                        start_vel);
-    vertices.push_back(start);
-
-    /******* Configure end point *******/
-    // set end point constraints to desired position and set all derivatives to zero
-    end.makeStartOrEnd(goal_pos, derivative_to_optimize);
-    end.addConstraint(mav_trajectory_generation::derivative_order::VELOCITY,
-                      goal_vel);
-    vertices.push_back(end);
-
-    // setimate initial segment times
-    std::vector<double> segment_times;
-    segment_times = estimateSegmentTimes(vertices, v_max, a_max);
-
-    // Set up polynomial solver with default params
-    // mav_trajectory_generation::NonlinearOptimizationParameters parameters;
-
-    // // set up optimization problem
-    // const int N = 10;
-    // mav_trajectory_generation::PolynomialOptimizationNonLinear<N> opt(dimension, parameters);
-    // opt.setupFromVertices(vertices, segment_times, derivative_to_optimize);
-
-    // // constrain velocity and acceleration
-    // opt.addMaximumMagnitudeConstraint(mav_trajectory_generation::derivative_order::VELOCITY, v_max);
-    // opt.addMaximumMagnitudeConstraint(mav_trajectory_generation::derivative_order::ACCELERATION, a_max);
-
-    // // solve trajectory
-    // opt.optimize();
-
-    // Linear Optimization
-    const int N = 10;
-    mav_trajectory_generation::PolynomialOptimization<N> opt(dimension);
-    opt.setupFromVertices(vertices, segment_times, derivative_to_optimize);
-    opt.solveLinear();
-
-    // get trajectory as polynomial parameters
-    opt.getTrajectory(&(*trajectory));
-    trajectory->scaleSegmentTimesToMeetConstraints(v_max, a_max);
-    
-    return true;
   }
 
 } //namespace geranos

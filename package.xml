@@ -24,5 +24,7 @@
   <depend>tf2_ros</depend>
   <depend>mav_trajectory_generation</depend>
   <depend>mav_trajectory_generation_ros</depend>
+  <depend>omav_local_planner</depend>
+  
 
 </package>
