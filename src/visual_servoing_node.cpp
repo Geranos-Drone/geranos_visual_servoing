@@ -201,7 +201,7 @@ namespace geranos {
       return;
 
     // get error vector 
-    Eigen::Vector3d goal = current_pole_pos_vicon_ + Eigen::Vector3d(0.0, 0.0, 1.8);
+    Eigen::Vector3d goal = current_pole_pos_ + Eigen::Vector3d(0.0, 0.0, 1.8);
     Eigen::Vector3d error = goal - current_odometry_.position_W;
 
     ros::Time t_now = ros::Time::now();
