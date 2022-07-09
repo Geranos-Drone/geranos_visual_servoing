@@ -264,6 +264,10 @@ namespace geranos {
       ang_error = ang_error + 2* M_PI;
     }
 
+    ROS_INFO_STREAM("ang error = " << ang_error);
+
+    ROS_INFO_STREAM("error norm = " << error.norm());
+
     if(error.norm() < 0.1){
       yaw_velocity_command = 0.0;
     } else {
