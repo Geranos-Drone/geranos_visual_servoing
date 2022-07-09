@@ -29,7 +29,7 @@ namespace geranos {
       // create publisher for estimation error
       error_pub_ = nh_.advertise<geometry_msgs::PointStamped>(ros::this_node::getName() + "/error_vector", 0);
 
-      timer_ = nh_.createTimer(ros::Duration(1.0), &VisualServoingNode::run, this);
+      timer_run_ = nh_.createTimer(ros::Duration(1.0/200.0), &VisualServoingNode::run, this);
 
       activate_service_ = nh_.advertiseService("activate_servoing_service", &VisualServoingNode::activateServoingSrv, this);
 
@@ -112,6 +112,9 @@ namespace geranos {
     if (!nh_.getParam(ros::this_node::getName() + "/sampling_time", sampling_time_)){
       ROS_WARN("[VisualServoingNode] param sampling_time not found");
     }
+    if (!nh_.getParam(ros::this_node::getName() + "/k_p", k_p_)){
+      ROS_WARN("[VisualServoingNode] param k_p not found");
+    }
   }
 
   void VisualServoingNode::loadTFs() {
@@ -149,6 +152,10 @@ namespace geranos {
   
   bool VisualServoingNode::activateServoingSrv(std_srvs::Empty::Request& request, std_srvs::Empty::Response& response) {
     current_yaw_ = mav_msgs::yawFromQuaternion(current_odometry_.orientation_W_B);
+    start_position_ = current_odometry_.position_W;
+    velocity_integral_ = Eigen::Vector3d::Zero();
+    t_last_run_ = ros::Time::now();
+
     if (activated_)
       activated_ = false;
     else 
@@ -188,40 +195,50 @@ namespace geranos {
     return true;
   }
 
-
   void VisualServoingNode::run(const ros::TimerEvent& event) {
 
     if (!received_odometry_  || !activated_)
       return;
 
-    ROS_INFO_STREAM("[VisualServoingNode] RUNNING");
-
-    // get unit vector into direction of pole
+    // get error vector 
     Eigen::Vector3d goal = current_pole_pos_vicon_ + Eigen::Vector3d(0.0, 0.0, 1.8);
-    Eigen::Vector3d diff = goal - current_odometry_.position_W;
-    Eigen::Vector3d direction = diff.normalized();
-    double distance = diff.norm();
+    Eigen::Vector3d error = goal - current_odometry_.position_W;
+
+    ros::Time t_now = ros::Time::now();
+    double sampling_time = (t_now - t_last_run_).toSec();
+    t_last_run_ = t_now;
+
+    ROS_INFO_STREAM("sampling_time = " << sampling_time);
+
+    Eigen::Vector3d velocity_command = error * k_p_;
+
+    velocity_integral_ += velocity_command * sampling_time;
 
     // get difference in yaw
-    double yaw_cam = 120.0 / 180.0 * M_PI;
-    double yaw_diff = (atan2(current_pole_pos_B_(0), current_pole_pos_B_(1)) + yaw_cam) * 0.2;
+    // double yaw_cam = 120.0 / 180.0 * M_PI;
+    // double yaw_diff = (atan2(current_pole_pos_B_(0), current_pole_pos_B_(1)) + yaw_cam) * 0.2;
 
-    double carrot_distance = 0.05;
-    if (distance < 0.1)
-      carrot_distance = distance * 0.2;
+    // v = k * diff
+    // waypoint position += v 
 
-    Eigen::Vector3d desired_position = current_odometry_.position_W + carrot_distance * direction;
-    double desired_yaw = mav_msgs::yawFromQuaternion(current_odometry_.orientation_W_B) + yaw_diff;
-    Eigen::Quaterniond desired_orientation = mav_msgs::quaternionFromYaw(desired_yaw);
+    waypoint_position_ = start_position_ + velocity_integral_;
+    // double desired_yaw = mav_msgs::yawFromQuaternion(current_odometry_.orientation_W_B) + yaw_diff;
+    // waypoint_orientation_ = mav_msgs::quaternionFromYaw(desired_yaw);
+    // debug
+    waypoint_orientation_ = mav_msgs::quaternionFromYaw(mav_msgs::yawFromQuaternion(current_odometry_.orientation_W_B));
+
+    // ROS_INFO_STREAM("[VisualServoingNode] RUNNING");
 
     trajectory_msgs::MultiDOFJointTrajectory trajectory_msg;
     trajectory_msg.header.stamp = ros::Time::now();
     trajectory_msg.header.frame_id = "world";
 
-    Eigen::Vector3d velocity_des(0.0, 0.0, 0.0);
+    Eigen::Vector3d desired_position = waypoint_position_;
+    Eigen::Vector3d velocity_des = velocity_command;
     Eigen::Vector3d acceleration_des(0.0, 0.0, 0.0);
     Eigen::Vector3d jerk_des(0.0, 0.0, 0.0);
     Eigen::Vector3d snap_des(0.0, 0.0, 0.0);
+    Eigen::Quaterniond desired_orientation = waypoint_orientation_;
     Eigen::Vector3d angular_velocity_des(0.0, 0.0, 0.0);
     Eigen::Vector3d angular_accel_des(0.0, 0.0, 0.0);
     Eigen::Vector3d force_des(0.0, 0.0, 0.0);
@@ -245,6 +262,31 @@ namespace geranos {
     mav_trajectory_generation::drawMavSampledTrajectory(states_, marker_distance, frame_id, &markers);
 
     pub_markers_.publish(markers);
+  }
+
+  void VisualServoingNode::updateWaypoint(const ros::TimerEvent& event) {
+    // get unit vector into direction of pole
+    Eigen::Vector3d goal = current_pole_pos_vicon_ + Eigen::Vector3d(0.0, 0.0, 1.8);
+    Eigen::Vector3d diff = goal - current_odometry_.position_W;
+    Eigen::Vector3d direction = diff.normalized();
+    double distance = diff.norm();
+
+    // get difference in yaw
+    // double yaw_cam = 120.0 / 180.0 * M_PI;
+    // double yaw_diff = (atan2(current_pole_pos_B_(0), current_pole_pos_B_(1)) + yaw_cam) * 0.2;
+
+    // v = k * diff
+    // waypoint position += v 
+
+    double carrot_distance = 0.2;
+    if (distance < 0.1)
+      carrot_distance = distance * 0.2;
+
+    waypoint_position_ = current_odometry_.position_W + carrot_distance * direction;
+    // double desired_yaw = mav_msgs::yawFromQuaternion(current_odometry_.orientation_W_B) + yaw_diff;
+    // waypoint_orientation_ = mav_msgs::quaternionFromYaw(desired_yaw);
+    // debug
+    waypoint_orientation_ = mav_msgs::quaternionFromYaw(mav_msgs::yawFromQuaternion(current_odometry_.orientation_W_B));
   }
 
   // Plans a trajectory from a start position and velocity to a goal position and velocity

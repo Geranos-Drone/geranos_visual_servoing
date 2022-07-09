@@ -47,6 +47,7 @@ namespace geranos {
 		~VisualServoingNode();
 
 		void run(const ros::TimerEvent& event);
+		void updateWaypoint(const ros::TimerEvent& event);
 	private:
 		void odometryCallback(const nav_msgs::OdometryConstPtr& odometry_msg);
 		void poseEstimateCallback(const geometry_msgs::PoseStamped::ConstPtr& pose_msg);
@@ -82,7 +83,8 @@ namespace geranos {
 		ros::Publisher pole_pos_pub_;
 		ros::Publisher error_pub_;
 
-		ros::Timer timer_;
+		ros::Timer timer_run_;
+		ros::Timer timer_update_;
 
 		ros::ServiceServer activate_service_;
 
@@ -102,6 +104,12 @@ namespace geranos {
 		mav_msgs::EigenTrajectoryPoint pole_trajectory_point_;
 		Eigen::Vector3d current_pole_pos_vicon_;
 
+		Eigen::Vector3d start_position_;
+		Eigen::Vector3d velocity_integral_;
+
+		Eigen::Vector3d waypoint_position_;
+		Eigen::Quaterniond waypoint_orientation_;
+
 		bool received_odometry_;
 		bool received_pole_pose_;
 		bool activated_;
@@ -113,6 +121,10 @@ namespace geranos {
 		double sampling_time_;
 
 		double current_yaw_;
+
+		double k_p_;
+
+		ros::Time t_last_run_;
 
 		mav_msgs::EigenTrajectoryPoint::Vector states_;
 		TrajectoryState traj_state_;
