@@ -255,7 +255,9 @@ namespace geranos {
     double yaw_velocity_command;
 
     double yaw_cam = - 2 / 3 * M_PI;
-    double ang_error = (atan2(current_pole_pos_B_(0), current_pole_pos_B_(1)) + yaw_cam);
+    double ang_error = atan2(current_pole_pos_B_(0), current_pole_pos_B_(1)) + yaw_cam;
+
+    ROS_INFO_STREAM("atan2 = " << atan2(current_pole_pos_B_(0), current_pole_pos_B_(1)));
 
     if(ang_error > M_PI){
       ang_error = ang_error - 2 * M_PI;
@@ -264,17 +266,13 @@ namespace geranos {
       ang_error = ang_error + 2* M_PI;
     }
 
-    ROS_INFO_STREAM("ang error = " << ang_error);
-
-    ROS_INFO_STREAM("error norm = " << error.norm());
+    ROS_INFO_STREAM("MPI = " << M_PI);
 
     if(error.norm() < 0.1){
       yaw_velocity_command = 0.0;
     } else {
       yaw_velocity_command = ang_error * k_p_ang_;
     }
-
-    ROS_INFO_STREAM("yaw_velocity_command = " << yaw_velocity_command);
 
     angular_velocity_integral_ += yaw_velocity_command * sampling_time;
 
