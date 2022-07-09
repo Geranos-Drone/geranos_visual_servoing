@@ -123,9 +123,14 @@ namespace geranos {
 		double max_ang_a_;
 		double sampling_time_;
 
+		double start_yaw_;
 		double current_yaw_;
+		
+		double angular_velocity_command_;
+		double angular_velocity_integral_;
 
 		double k_p_;
+		double k_p_ang_;
 
 		ros::Time t_last_run_;
 

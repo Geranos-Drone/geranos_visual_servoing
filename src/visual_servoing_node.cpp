@@ -157,6 +157,9 @@ namespace geranos {
     if (!nh_.getParam(ros::this_node::getName() + "/k_p", k_p_)){
       ROS_WARN("[VisualServoingNode] param k_p not found");
     }
+    if (!nh_.getParam(ros::this_node::getName() + "/k_p_ang", k_p_ang_)){
+      ROS_WARN("[VisualServoingNode] param k_p not found");
+    }
   }
 
   void VisualServoingNode::loadTFs() {
@@ -230,19 +233,39 @@ namespace geranos {
     // double yaw_cam = 120.0 / 180.0 * M_PI;
     // double yaw_diff = (atan2(current_pole_pos_B_(0), current_pole_pos_B_(1)) + yaw_cam) * 0.2;
 
-    Eigen::Vector3d ang_velocity_command;
 
     Eigen::Vector3d waypoint_position = start_position_ + velocity_integral_;
-    // double desired_yaw = mav_msgs::yawFromQuaternion(current_odometry_.orientation_W_B) + yaw_diff;
-    // waypoint_orientation_ = mav_msgs::quaternionFromYaw(desired_yaw);
-    // debug
-    Eigen::Quaterniond waypoint_orientation = mav_msgs::quaternionFromYaw(current_yaw_);
+
+    double yaw_velocity_command;
+
+    double yaw_cam = - 2 / 3 * M_PI;
+    double ang_error = (atan2(current_pole_pos_B_(0), current_pole_pos_B_(1)) + yaw_cam);
+
+    if(ang_error > M_PI){
+      ang_error = ang_error - 2 * M_PI;
+    }
+    if(ang_error < -M_PI){
+      ang_error = ang_error + 2* M_PI;
+    }
+
+    if(error.norm() < 0.1){
+      yaw_velocity_command = 0.0;
+    } else {
+      yaw_velocity_command = ang_error * k_p_ang_;
+    }
+
+    angular_velocity_integral_ += yaw_velocity_command * sampling_time;
+
+    double waypoint_yaw = start_yaw_ + angular_velocity_integral_;
+
+    Eigen::Quaterniond waypoint_orientation = mav_msgs::quaternionFromYaw(waypoint_yaw);
+    Eigen::Vector3d waypoint_ang_velocity = Eigen::Vector3d(0.0, 0.0, yaw_velocity_command);
 
     trajectory_msgs::MultiDOFJointTrajectory trajectory_msg;
     double duration = 0.0;
     generateTrajectoryMsg(trajectory_msg, waypoint_position, 
                           waypoint_orientation, velocity_command, 
-                          ang_velocity_command, duration);
+                          waypoint_ang_velocity, duration);
 
     pub_trajectory_.publish(trajectory_msg);
 
