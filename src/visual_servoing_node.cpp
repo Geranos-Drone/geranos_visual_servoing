@@ -105,10 +105,35 @@ namespace geranos {
   }
 
   bool VisualServoingNode::grabPoleSrv(std_srvs::Empty::Request& request, std_srvs::Empty::Response& response) {
+    if (activated_) {
+      activated_ = false;
+    }
+    Eigen::Vector3d waypoint_position = current_odometry_.position_W - Eigen::Vector3d(0.0, 0.0, 1.1);
+    Eigen::Quaterniond waypoint_orientation = mav_msgs::quaternionFromYaw(current_yaw_);
+    Eigen::Vector3d velocity_command (0.0, 0.0, 0.0);
+    Eigen::Vector3d ang_velocity_command (0.0, 0.0, 0.0);
+    double duration = 5.0;
+    trajectory_msgs::MultiDOFJointTrajectory trajectory_msg;
+    generateTrajectoryMsg(trajectory_msg, waypoint_position, 
+                          waypoint_orientation, velocity_command, 
+                          ang_velocity_command, duration);
+    pub_trajectory_.publish(trajectory_msg);
     return true;
   }
 
   bool VisualServoingNode::liftPoleSrv(std_srvs::Empty::Request& request, std_srvs::Empty::Response& response) {
+    if (activated_) {
+      activated_ = false;
+    }
+    Eigen::Vector3d waypoint_position = current_odometry_.position_W + Eigen::Vector3d(0.0, 0.0, 1.1);
+    Eigen::Quaterniond waypoint_orientation = mav_msgs::quaternionFromYaw(current_yaw_);
+    Eigen::Vector3d velocity_command (0.0, 0.0, 0.0);
+    Eigen::Vector3d ang_velocity_command (0.0, 0.0, 0.0);
+    double duration = 5.0;
+    trajectory_msgs::MultiDOFJointTrajectory trajectory_msg;
+    generateTrajectoryMsg(trajectory_msg, waypoint_position, 
+                          waypoint_orientation, velocity_command, 
+                          ang_velocity_command, duration);
     return true;
   }
 
@@ -205,45 +230,56 @@ namespace geranos {
     // double yaw_cam = 120.0 / 180.0 * M_PI;
     // double yaw_diff = (atan2(current_pole_pos_B_(0), current_pole_pos_B_(1)) + yaw_cam) * 0.2;
 
-    waypoint_position_ = start_position_ + velocity_integral_;
+    Eigen::Vector3d ang_velocity_command;
+
+    Eigen::Vector3d waypoint_position = start_position_ + velocity_integral_;
     // double desired_yaw = mav_msgs::yawFromQuaternion(current_odometry_.orientation_W_B) + yaw_diff;
     // waypoint_orientation_ = mav_msgs::quaternionFromYaw(desired_yaw);
     // debug
-    waypoint_orientation_ = mav_msgs::quaternionFromYaw(current_yaw_);
+    Eigen::Quaterniond waypoint_orientation = mav_msgs::quaternionFromYaw(current_yaw_);
 
     trajectory_msgs::MultiDOFJointTrajectory trajectory_msg;
-    trajectory_msg.header.stamp = ros::Time::now();
-    trajectory_msg.header.frame_id = "world";
-
-    Eigen::Vector3d desired_position = waypoint_position_;
-    Eigen::Vector3d velocity_des = velocity_command;
-    Eigen::Vector3d acceleration_des(0.0, 0.0, 0.0);
-    Eigen::Vector3d jerk_des(0.0, 0.0, 0.0);
-    Eigen::Vector3d snap_des(0.0, 0.0, 0.0);
-    Eigen::Quaterniond desired_orientation = waypoint_orientation_;
-    Eigen::Vector3d angular_velocity_des(0.0, 0.0, 0.0);
-    Eigen::Vector3d angular_accel_des(0.0, 0.0, 0.0);
-    Eigen::Vector3d force_des(0.0, 0.0, 0.0);
-    Eigen::Vector3d torque_des(0.0, 0.0, 0.0);
-
-    mav_msgs::EigenTrajectoryPoint trajectory_point(
-        0.0, desired_position, velocity_des, acceleration_des, jerk_des, snap_des,
-        desired_orientation, angular_velocity_des, angular_accel_des, force_des, torque_des);
-
-    mav_msgs::msgMultiDofJointTrajectoryFromEigen(trajectory_point, &trajectory_msg);
+    double duration = 0.0;
+    generateTrajectoryMsg(trajectory_msg, waypoint_position, 
+                          waypoint_orientation, velocity_command, 
+                          ang_velocity_command, duration);
 
     pub_trajectory_.publish(trajectory_msg);
 
-    states_.clear();  
-    states_.push_back(trajectory_point);
-
-    // get markers to display them in RVIZ
+    // get marker to display Waypoint in RVIZ
     visualization_msgs::MarkerArray markers;
     double marker_distance = 0.02; // Distance by which to seperate additional markers. Set 0.0 to disable.
     std::string frame_id = "world";
     mav_trajectory_generation::drawMavSampledTrajectory(states_, marker_distance, frame_id, &markers);
 
     pub_markers_.publish(markers);
+  }
+
+  void VisualServoingNode::generateTrajectoryMsg(trajectory_msgs::MultiDOFJointTrajectory& msg,
+                    const Eigen::Vector3d& waypoint_position,
+                    const Eigen::Quaterniond& waypoint_orientation,
+                    const Eigen::Vector3d& velocity_command,
+                    const Eigen::Vector3d& ang_velocity_command,
+                    double duration) {
+    msg.header.stamp = ros::Time::now();
+    msg.header.frame_id = "world";
+
+    Eigen::Vector3d acceleration_des(0.0, 0.0, 0.0);
+    Eigen::Vector3d jerk_des(0.0, 0.0, 0.0);
+    Eigen::Vector3d snap_des(0.0, 0.0, 0.0);
+    Eigen::Vector3d angular_velocity_des(0.0, 0.0, 0.0);
+    Eigen::Vector3d angular_accel_des(0.0, 0.0, 0.0);
+    Eigen::Vector3d force_des(0.0, 0.0, 0.0);
+    Eigen::Vector3d torque_des(0.0, 0.0, 0.0);
+
+    mav_msgs::EigenTrajectoryPoint trajectory_point(
+        duration, waypoint_position, velocity_command, acceleration_des, jerk_des, snap_des,
+        waypoint_orientation, angular_velocity_des, angular_accel_des, force_des, torque_des);
+
+    mav_msgs::msgMultiDofJointTrajectoryFromEigen(trajectory_point, &msg);
+
+    states_.clear();  
+    states_.push_back(trajectory_point);
   }
 
 } //namespace geranos

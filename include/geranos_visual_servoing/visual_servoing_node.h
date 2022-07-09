@@ -58,6 +58,13 @@ namespace geranos {
 	  	bool grabPoleSrv(std_srvs::Empty::Request& request, std_srvs::Empty::Response& response);
   		bool liftPoleSrv(std_srvs::Empty::Request& request, std_srvs::Empty::Response& response);
 
+  		void generateTrajectoryMsg(trajectory_msgs::MultiDOFJointTrajectory& msg,
+  									const Eigen::Vector3d& waypoint_position,
+  									const Eigen::Quaterniond& waypoint_orientation,
+  									const Eigen::Vector3d& velocity_command,
+  									const Eigen::Vector3d& ang_velocity_command,
+  									double duration);
+
 		void loadParams();
 		void loadTFs();
 
