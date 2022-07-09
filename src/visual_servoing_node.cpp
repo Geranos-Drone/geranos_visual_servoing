@@ -118,6 +118,13 @@ namespace geranos {
                           waypoint_orientation, velocity_command, 
                           ang_velocity_command, duration);
     pub_trajectory_.publish(trajectory_msg);
+    // get marker to display Waypoint in RVIZ
+    visualization_msgs::MarkerArray markers;
+    double marker_distance = 0.02; // Distance by which to seperate additional markers. Set 0.0 to disable.
+    std::string frame_id = "world";
+    mav_trajectory_generation::drawMavSampledTrajectory(states_, marker_distance, frame_id, &markers);
+
+    pub_markers_.publish(markers);
     return true;
   }
 
@@ -134,6 +141,14 @@ namespace geranos {
     generateTrajectoryMsg(trajectory_msg, waypoint_position, 
                           waypoint_orientation, velocity_command, 
                           ang_velocity_command, duration);
+    pub_trajectory_.publish(trajectory_msg);
+    // get marker to display Waypoint in RVIZ
+    visualization_msgs::MarkerArray markers;
+    double marker_distance = 0.02; // Distance by which to seperate additional markers. Set 0.0 to disable.
+    std::string frame_id = "world";
+    mav_trajectory_generation::drawMavSampledTrajectory(states_, marker_distance, frame_id, &markers);
+
+    pub_markers_.publish(markers);
     return true;
   }
 
