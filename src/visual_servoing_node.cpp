@@ -253,7 +253,11 @@ namespace geranos {
     double sampling_time = (t_now - t_last_run_).toSec();
     t_last_run_ = t_now;
 
-    Eigen::Vector3d velocity_command = error * k_p_;
+    Eigen::Vector3d velocity_command = error * k_p_; // alternative: error.pow(1/3) * k_p_
+
+    if(velocity_command.abs() > max_v_){
+      velocity_command = velocity_command.normalized() * max_v_;
+    }
 
     velocity_integral_ += velocity_command * sampling_time;
 
