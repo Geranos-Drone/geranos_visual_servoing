@@ -267,8 +267,10 @@ namespace geranos {
 
     double yaw_cam = - 2 / 3 * M_PI;
     double yaw_desired = std::atan2(error(1), error(0)) - yaw_cam;
+    ROS_INFO_STREAM("yaw_desired = " << yaw_desired);
 
     double current_yaw = mav_msgs::yawFromQuaternion(current_odometry_.orientation_W_B);
+    ROS_INFO_STREAM("current_yaw = " << current_yaw);
     double yaw_error = yaw_desired - current_yaw;
 
     if(yaw_error > M_PI){
