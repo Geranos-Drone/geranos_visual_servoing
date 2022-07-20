@@ -228,6 +228,7 @@ namespace geranos {
     velocity_integral_ = Eigen::Vector3d::Zero();
     angular_velocity_integral_ = 0.0;
     t_last_run_ = ros::Time::now();
+    states_.clear();
 
     if (activated_){
       ROS_INFO_STREAM("[VisualServoingNode] DE-ACTIVATED SERVOING");
@@ -336,7 +337,7 @@ namespace geranos {
 
     mav_msgs::msgMultiDofJointTrajectoryFromEigen(trajectory_point, &msg);
 
-    states_.clear();  
+    // states_.clear();  
     states_.push_back(trajectory_point);
   }
 
