@@ -265,7 +265,7 @@ namespace geranos {
 
     double yaw_velocity_command;
 
-    double yaw_cam = - 2 / 3 * M_PI;
+    double yaw_cam = -2.0/3.0*M_PI;
     double yaw_desired = std::atan2(error(1), error(0)) - yaw_cam;
     ROS_INFO_STREAM("atan2 = " << std::atan2(error(1), error(0)));
     ROS_INFO_STREAM("yaw_desired = " << yaw_desired);
