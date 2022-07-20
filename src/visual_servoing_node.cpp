@@ -255,7 +255,7 @@ namespace geranos {
 
     Eigen::Vector3d velocity_command = error * k_p_; // alternative: error.pow(1/3) * k_p_
 
-    if(velocity_command.abs() > max_v_){
+    if(velocity_command.norm() > max_v_){
       velocity_command = velocity_command.normalized() * max_v_;
     }
 
@@ -273,15 +273,19 @@ namespace geranos {
     double yaw_error = yaw_desired - current_yaw;
 
     if(yaw_error > M_PI){
+      ROS_INFO_STREAM("[VisualServoingNode] yaw_error > M_PI");
       yaw_error = yaw_error - 2 * M_PI;
     }
     if(yaw_error < -M_PI){
+      ROS_INFO_STREAM("[VisualServoingNode] yaw_error < -M_PI");
       yaw_error = yaw_error + 2* M_PI;
     }
 
     if(error.norm() < 0.1){
+      ROS_INFO_STREAM("[VisualServoingNode] Error Norm < 0.1");
       yaw_velocity_command = 0.0;
-    } else {
+    } 
+    else {
       yaw_velocity_command = yaw_error * k_p_ang_;
     }
 
