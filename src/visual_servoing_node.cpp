@@ -153,7 +153,7 @@ namespace geranos {
                           waypoint_orientation, velocity_command, 
                           ang_velocity_command, duration);
     pub_trajectory_.publish(trajectory_msg);
-    
+
     // get marker to display Waypoint in RVIZ
     visualization_msgs::MarkerArray markers;
     double marker_distance = 0.02; // Distance by which to seperate additional markers. Set 0.0 to disable.
@@ -261,31 +261,28 @@ namespace geranos {
 
     velocity_integral_ += velocity_command * sampling_time;
 
-    // get difference in yaw
-    // double yaw_cam = 120.0 / 180.0 * M_PI;
-    // double yaw_diff = (atan2(current_pole_pos_B_(0), current_pole_pos_B_(1)) + yaw_cam) * 0.2;
-
 
     Eigen::Vector3d waypoint_position = start_position_ + velocity_integral_;
 
     double yaw_velocity_command;
 
     double yaw_cam = - 2 / 3 * M_PI;
-    double ang_error = std::atan2(error(1), error(0)) - yaw_cam;
+    double yaw_desired = std::atan2(error(1), error(0)) - yaw_cam;
 
-    ROS_INFO_STREAM("atan2 = " << std::atan2(error(1), error(0)));
+    double current_yaw = mav_msgs::yawFromQuaternion(current_odometry_.orientation_W_B);
+    double yaw_error = yaw_desired - current_yaw;
 
-    if(ang_error > M_PI){
-      ang_error = ang_error - 2 * M_PI;
+    if(yaw_error > M_PI){
+      yaw_error = yaw_error - 2 * M_PI;
     }
-    if(ang_error < -M_PI){
-      ang_error = ang_error + 2* M_PI;
+    if(yaw_error < -M_PI){
+      yaw_error = yaw_error + 2* M_PI;
     }
 
     if(error.norm() < 0.1){
       yaw_velocity_command = 0.0;
     } else {
-      yaw_velocity_command = ang_error * k_p_ang_;
+      yaw_velocity_command = yaw_error * k_p_ang_;
     }
 
     angular_velocity_integral_ += yaw_velocity_command * sampling_time;
