@@ -1,5 +1,5 @@
 sampling_time: 0.01
 max_v: 0.2
 max_a: 0.2
-k_p: 0.1
+k_p: 0.5
 k_p_ang: 0.05
