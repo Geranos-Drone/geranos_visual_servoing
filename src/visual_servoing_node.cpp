@@ -42,7 +42,9 @@ namespace geranos {
     // create publisher for RVIZ markers
     pub_markers_ = nh_.advertise<visualization_msgs::MarkerArray>(ros::this_node::getName() + "/trajectory_markers", 0);
     // create publisher for estimation error
-    error_pub_ = nh_.advertise<geometry_msgs::PointStamped>(ros::this_node::getName() + "/error_vector", 0);    
+    error_pub_ = nh_.advertise<geometry_msgs::PointStamped>(ros::this_node::getName() + "/error_vector", 0);
+    // create publisher for transformed odom
+    transformed_odom_pub_ = nh_.advertise<nav_msgs::Odometry>(ros::this_node::getName() + "/transformed_odometry", 1);    
   }
 
   void VisualServoingNode::initializeServices() {
@@ -56,8 +58,14 @@ namespace geranos {
     mav_msgs::EigenOdometry odom;
     mav_msgs::eigenOdometryFromMsg(*odometry_msg, &odom);
     transformOdometry(odom);
+    publishOdometry(odom);
     current_odometry_ = odom;
     received_odometry_ = true;
+  }
+  void VisualServoingNode::publishOdometry(const mav_msgs::EigenOdometry& odom) {
+    nav_msgs::Odometry odometry_msg;
+    mav_msgs::msgOdometryFromEigen(odom, &odometry_msg);
+    transformed_odom_pub_.publish(odometry_msg);
   }
 
   void VisualServoingNode::transformOdometry(mav_msgs::EigenOdometry& odometry) {
@@ -113,11 +121,13 @@ namespace geranos {
     Eigen::Vector3d velocity_command (0.0, 0.0, 0.0);
     Eigen::Vector3d ang_velocity_command (0.0, 0.0, 0.0);
     double duration = 5e9;
+
     trajectory_msgs::MultiDOFJointTrajectory trajectory_msg;
     generateTrajectoryMsg(trajectory_msg, waypoint_position, 
                           waypoint_orientation, velocity_command, 
                           ang_velocity_command, duration);
     pub_trajectory_.publish(trajectory_msg);
+
     // get marker to display Waypoint in RVIZ
     visualization_msgs::MarkerArray markers;
     double marker_distance = 0.02; // Distance by which to seperate additional markers. Set 0.0 to disable.
@@ -137,11 +147,13 @@ namespace geranos {
     Eigen::Vector3d velocity_command (0.0, 0.0, 0.0);
     Eigen::Vector3d ang_velocity_command (0.0, 0.0, 0.0);
     double duration = 5e9;
+
     trajectory_msgs::MultiDOFJointTrajectory trajectory_msg;
     generateTrajectoryMsg(trajectory_msg, waypoint_position, 
                           waypoint_orientation, velocity_command, 
                           ang_velocity_command, duration);
     pub_trajectory_.publish(trajectory_msg);
+    
     // get marker to display Waypoint in RVIZ
     visualization_msgs::MarkerArray markers;
     double marker_distance = 0.02; // Distance by which to seperate additional markers. Set 0.0 to disable.
@@ -255,7 +267,7 @@ namespace geranos {
     double yaw_velocity_command;
 
     double yaw_cam = - 2 / 3 * M_PI;
-    double ang_error = std::atan2(error(1), error(0)) + yaw_cam;
+    double ang_error = std::atan2(error(1), error(0)) - yaw_cam;
 
     ROS_INFO_STREAM("atan2 = " << std::atan2(error(1), error(0)));
 
@@ -265,8 +277,6 @@ namespace geranos {
     if(ang_error < -M_PI){
       ang_error = ang_error + 2* M_PI;
     }
-
-    ROS_INFO_STREAM("MPI = " << M_PI);
 
     if(error.norm() < 0.1){
       yaw_velocity_command = 0.0;

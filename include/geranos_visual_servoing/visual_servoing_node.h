@@ -70,6 +70,7 @@ namespace geranos {
 
 		void transformPose();
 		void transformOdometry(mav_msgs::EigenOdometry& odometry);
+		void publishOdometry(const mav_msgs::EigenOdometry& odom);
 
 
 
@@ -83,6 +84,7 @@ namespace geranos {
 		ros::Publisher pub_markers_;
 		ros::Publisher pole_pos_pub_;
 		ros::Publisher error_pub_;
+		ros::Publisher transformed_odom_pub_;
 
 		ros::Timer timer_run_;
 		ros::Timer timer_update_;
