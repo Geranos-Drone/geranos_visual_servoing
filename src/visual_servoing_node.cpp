@@ -267,21 +267,19 @@ namespace geranos {
 
     double yaw_cam = -2.0/3.0*M_PI;
     double yaw_desired = std::atan2(error(1), error(0)) - yaw_cam;
-    ROS_INFO_STREAM("atan2 = " << std::atan2(error(1), error(0)));
-    ROS_INFO_STREAM("yaw_desired = " << yaw_desired);
 
+    if(yaw_desired > M_PI){
+      ROS_INFO_STREAM("[VisualServoingNode] yaw_desired > M_PI");
+      yaw_desired = yaw_desired - 2.0 * M_PI;
+    }
+    if(yaw_desired < -M_PI){
+      ROS_INFO_STREAM("[VisualServoingNode] yaw_desired < -M_PI");
+      yaw_desired = yaw_desired + 2.0 * M_PI;
+    }
+    ROS_INFO_STREAM("yaw_desired = " << yaw_desired);
     double current_yaw = mav_msgs::yawFromQuaternion(current_odometry_.orientation_W_B);
     ROS_INFO_STREAM("current_yaw = " << current_yaw);
     double yaw_error = yaw_desired - current_yaw;
-
-    if(yaw_error > M_PI){
-      ROS_INFO_STREAM("[VisualServoingNode] yaw_error > M_PI");
-      yaw_error = yaw_error - 2 * M_PI;
-    }
-    if(yaw_error < -M_PI){
-      ROS_INFO_STREAM("[VisualServoingNode] yaw_error < -M_PI");
-      yaw_error = yaw_error + 2* M_PI;
-    }
 
     if(error.norm() < 0.2){
       ROS_INFO_STREAM("[VisualServoingNode] Error Norm < 0.2");
