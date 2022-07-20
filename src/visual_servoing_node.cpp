@@ -256,6 +256,7 @@ namespace geranos {
     Eigen::Vector3d velocity_command = error * k_p_; // alternative: error.pow(1/3) * k_p_
 
     if(velocity_command.norm() > max_v_){
+      ROS_INFO_STREAM("[VisualServoingNode] velocity_command > max_v_");
       velocity_command = velocity_command.normalized() * max_v_;
     }
 
