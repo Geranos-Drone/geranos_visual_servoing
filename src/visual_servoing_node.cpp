@@ -261,8 +261,6 @@ namespace geranos {
     }
 
     velocity_integral_ += velocity_command * sampling_time;
-
-
     Eigen::Vector3d waypoint_position = start_position_ + velocity_integral_;
 
     double yaw_velocity_command;
@@ -282,8 +280,8 @@ namespace geranos {
       yaw_error = yaw_error + 2* M_PI;
     }
 
-    if(error.norm() < 0.1){
-      ROS_INFO_STREAM("[VisualServoingNode] Error Norm < 0.1");
+    if(error.norm() < 0.2){
+      ROS_INFO_STREAM("[VisualServoingNode] Error Norm < 0.2");
       yaw_velocity_command = 0.0;
     } 
     else {
