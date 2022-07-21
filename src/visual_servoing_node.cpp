@@ -282,6 +282,15 @@ namespace geranos {
     double current_yaw = mav_msgs::yawFromQuaternion(current_odometry_.orientation_W_B);
     double yaw_error = yaw_desired - current_yaw;
 
+    if(yaw_error > M_PI){
+      ROS_INFO_STREAM("[VisualServoingNode] yaw_error > M_PI");
+      yaw_error = yaw_error - 2.0 * M_PI;
+    }
+    if(yaw_error < -M_PI){
+      ROS_INFO_STREAM("[VisualServoingNode] yaw_error < -M_PI");
+      yaw_error = yaw_error + 2.0 * M_PI;
+    }
+
     publishYaw(yaw_desired, current_yaw, yaw_error);
 
     if(error.norm() < 0.2){
