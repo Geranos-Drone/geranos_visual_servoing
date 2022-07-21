@@ -71,6 +71,7 @@ namespace geranos {
 		void transformPose();
 		void transformOdometry(mav_msgs::EigenOdometry& odometry);
 		void publishOdometry(const mav_msgs::EigenOdometry& odom);
+		void publishYaw(const double yaw_desired, const double current_yaw, const double yaw_error);
 
 
 
@@ -85,6 +86,7 @@ namespace geranos {
 		ros::Publisher pole_pos_pub_;
 		ros::Publisher error_pub_;
 		ros::Publisher transformed_odom_pub_;
+		ros::Publisher yaw_pub_;
 
 		ros::Timer timer_run_;
 		ros::Timer timer_update_;

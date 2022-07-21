@@ -45,6 +45,8 @@ namespace geranos {
     error_pub_ = nh_.advertise<geometry_msgs::PointStamped>(ros::this_node::getName() + "/error_vector", 0);
     // create publisher for transformed odom
     transformed_odom_pub_ = nh_.advertise<nav_msgs::Odometry>(ros::this_node::getName() + "/transformed_odometry", 1);    
+    // create publisher for yaw control
+    yaw_pub_ = nh_.advertise<geometry_msgs::PointStamped>(ros::this_node::getName() + "/yaw", 0);
   }
 
   void VisualServoingNode::initializeServices() {
@@ -276,10 +278,11 @@ namespace geranos {
       ROS_INFO_STREAM("[VisualServoingNode] yaw_desired < -M_PI");
       yaw_desired = yaw_desired + 2.0 * M_PI;
     }
-    ROS_INFO_STREAM("yaw_desired = " << yaw_desired);
+
     double current_yaw = mav_msgs::yawFromQuaternion(current_odometry_.orientation_W_B);
-    ROS_INFO_STREAM("current_yaw = " << current_yaw);
     double yaw_error = yaw_desired - current_yaw;
+
+    publishYaw(yaw_desired, current_yaw, yaw_error);
 
     if(error.norm() < 0.2){
       ROS_INFO_STREAM("[VisualServoingNode] Error Norm < 0.2");
@@ -339,6 +342,15 @@ namespace geranos {
     states_.clear();  
     states_.push_back(trajectory_point);
   }
+
+  void VisualServoingNode::publishYaw(const double yaw_desired, const double current_yaw, const double yaw_error) {
+    Eigen::Vector3d vec;
+    vec << yaw_desired, current_yaw, yaw_error;
+    geometry_msgs::PointStamped msg;
+    getPointMsgFromEigen(vec, &msg);
+    yaw_pub_.publish(msg);
+  }
+
 
 } //namespace geranos
 
